@@ -1,0 +1,8 @@
+{
+  "resolution": "main",
+  "tree": {
+    "src": "https://raw.githubusercontent.com/DefinitelyTyped/DefinitelyTyped/9f19feb70d5f8e65689b7e630661302fe7f270aa/z-schema/z-schema.d.ts",
+    "raw": "registry:dt/z-schema#3.16.0+20160622084406",
+    "typings": "https://raw.githubusercontent.com/DefinitelyTyped/DefinitelyTyped/9f19feb70d5f8e65689b7e630661302fe7f270aa/z-schema/z-schema.d.ts"
+  }
+}

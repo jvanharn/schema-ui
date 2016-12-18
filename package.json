@@ -1,0 +1,17 @@
+{
+  "name": "schema-utils",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "cd tests; jasmine",
+    "build": "tsc"
+  },
+  "author": "Jeffrey vH",
+  "license": "MIT",
+  "dependencies": {
+    "es6-promise": "^4.0.5",
+    "lodash": "^4.17.2",
+    "z-schema": "^3.18.2"
+  }
+}
