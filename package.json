@@ -2,11 +2,17 @@
   "name": "json-schema-services",
   "version": "0.1.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/json-schema-services.js",
+  "typings": "dist/json-schema-services.d.ts",
   "scripts": {
     "test": "cd tests; jasmine",
-    "build": "tsc"
+    "build": "rm -rf dist/ && tsc"
   },
+  "files": [
+    "typings.json",
+    "dist/json-schema-services.js",
+    "dist/json-schema-services.d.ts"
+  ],
   "author": "Jeffrey vH",
   "license": "MIT",
   "dependencies": {

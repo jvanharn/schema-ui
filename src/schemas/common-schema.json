@@ -1,0 +1,12 @@
+{
+    "$schema": "http://json-schema.org/draft/hyper-schema#",
+    "id": "http://json.schemastore.org/schema-ui-common#",
+    "title": "Common JSON-Schema",
+    "allOf": [ { "$ref": "http://json-schema.org/draft/hyper-schema#" } ],
+    "properties": {
+        "entity": {
+            "description": "The name of the entity that this schema represents.",
+            "type": "string"
+        }
+    }
+}

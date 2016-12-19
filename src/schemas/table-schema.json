@@ -1,0 +1,37 @@
+{
+    "$schema": "http://json-schema.org/draft/hyper-schema#",
+    "id": "http://json.schemastore.org/schema-ui-table#",
+    "title": "Schema-UI Table JSON-Schema",
+    "allOf": [ { "$ref": "http://json-schema.org/draft/hyper-schema#" } ],
+    "properties": {
+        "columns": {
+            "description": "Schema column descriptor.",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "description": "The internal identifier for the column."
+                    },
+                    "path": {
+                        "description": "The json pointer that points to the value in the json object."
+                    },
+                    "type": {
+                        "description": "Type of column."
+                    },
+                    "filterable": {
+                        "description": "Whether or not the column is filterable."
+                    },
+                    "sortable": {
+                        "description": "sortable"
+                    }
+                },
+                "required": [
+                    "id",
+                    "path",
+                    "type"
+                ]
+            }
+        }
+    }
+}

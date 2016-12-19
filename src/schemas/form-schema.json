@@ -1,0 +1,86 @@
+{
+    "$schema": "http://json-schema.org/draft/hyper-schema#",
+    "id": "http://json.schemastore.org/schema-ui-form#",
+    "title": "Schema-UI Form JSON-Schema",
+    "definitions": {
+        "schemaArray": {
+            "allOf": [
+                { "$ref": "http://json.schemastore.org/schema-ui-form" },
+                {
+                    "items": { "$ref": "#" }
+                }
+            ]
+        }
+    },
+    "allOf": [ { "$ref": "http://json.schemastore.org/schema-ui-common#" } ],
+    "properties": {
+        "additionalItems": {
+            "anyOf": [
+                { "type": "boolean" },
+                { "$ref": "#" }
+            ]
+        },
+        "additionalProperties": {
+            "anyOf": [
+                { "type": "boolean" },
+                { "$ref": "#" }
+            ]
+        },
+        "dependencies": {
+            "additionalProperties": {
+                "anyOf": [
+                    { "$ref": "#" },
+                    { "type": "array" }
+                ]
+            }
+        },
+        "items": {
+            "anyOf": [
+                { "$ref": "#" },
+                { "$ref": "#/definitions/schemaArray" }
+            ]
+        },
+        "definitions": {
+            "additionalProperties": { "$ref": "#" }
+        },
+        "patternProperties": {
+            "additionalProperties": { "$ref": "#" }
+        },
+        "properties": {
+            "additionalProperties": { "$ref": "#" }
+        },
+        "allOf": { "$ref": "#/definitions/schemaArray" },
+        "anyOf": { "$ref": "#/definitions/schemaArray" },
+        "oneOf": { "$ref": "#/definitions/schemaArray" },
+        "not": { "$ref": "#" },
+
+        "field": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "description": "Name of the field type, it should be rendered as (if it should be different than the default logic resolving)",
+                    "type": "string"
+                },
+                "visible": {
+                    "description": "Whether or not the current property should be visible as a form field.",
+                    "type": "boolean"
+                },
+                "data": {
+                    "description": "Data that can be used by the renderer to alter the display of the field.",
+                    "type": "object"
+                },
+                "link": {
+                    "description": "Optional hyperlink name (ref) which describes where to fetch data related to this field. (E.g. when the current field is an id, an link to an resource that lists all possible values.)",
+                    "oneOf": [
+                        { "type": "string", "description": "The referenced 'rel' property." },
+                        { "type": "integer", "description": "The index of the referenced link in the links array." }
+                    ]
+                },
+                "targetIdentity": {
+                    "description": "When a link is specified, this property optionally identifies the identity property of the targeted schema/resource that should be matched with the contents of this property.",
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

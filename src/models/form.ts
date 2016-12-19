@@ -33,7 +33,7 @@ export interface SchemaFieldDescriptor
 
     /**
      * Whether or not the current property should be visible as a form field.
-     * 
+     *
      * If not set, but an explicit field type is set, implies visible. If true or false then those are used. In all other cases defaults to false.
      */
     visible?: boolean;
@@ -45,8 +45,12 @@ export interface SchemaFieldDescriptor
 
     /**
      * Optional hyperlink name (ref) which describes where to fetch data related to this field. (E.g. when the current field is an id, an link to an resource that lists all possible values.)
+     *
+     * Either:
+     *  - An string, refering to an unique "rel" value.
+     *  - An integer, refering to the index of the link to use.
      */
-    link?: string;
+    link?: string | number;
 
     /**
      * When a link is specified, this property optionally identifies the identity property of the targeted schema/resource that should be matched with the contents of this property.

@@ -12,9 +12,9 @@ export class MemorySchemaCache implements ISchemaCache {
 
     /**
      * Get a json-schema by id.
-     * 
+     *
      * @param id Schema id of the referenced schema.
-     * 
+     *
      * @return string
      */
     public getSchema(id: string): JsonSchema {
@@ -23,7 +23,7 @@ export class MemorySchemaCache implements ISchemaCache {
 
     /**
      * Add/set a schema in the cache.
-     * 
+     *
      * @param schema The JsonSchema to add to the cache.
      */
     public setSchema(schema: JsonSchema): void {
@@ -35,9 +35,9 @@ export class MemorySchemaCache implements ISchemaCache {
 
     /**
      * Get a schema by a predicate.
-     * 
+     *
      * @param predicate The predicate that will decide whether the given schema, is the schema you need.
-     * 
+     *
      * @return JsonSchema
      */
     public getSchemaBy(predicate: (schema: JsonSchema) => boolean): JsonSchema {

@@ -5,7 +5,8 @@
         "noImplicitAny": true,
         "removeComments": true,
         "preserveConstEnums": true,
-        "outFile": "dist/schem-utils.js",
+        "outFile": "dist/json-schema-services.js",
+        "declaration": true,
         "sourceMap": true
     },
     "include": [
