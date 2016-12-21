@@ -1,4 +1,5 @@
 import * as _ from 'lodash';
+import schema = require('z-schema');
 
 import { JsonSchema, JsonFormSchema, JsonTableSchema, CommonJsonSchema } from './models/index';
 
@@ -23,7 +24,7 @@ export class SchemaNavigator {
 
     /**
      * The name of the entity that this schema describes.
-     * 
+     *
      * When not set, the entity name is guessed based on the schema id.
      * @throws Error When the schema id and entity name are not set.
      */
@@ -91,7 +92,7 @@ export class SchemaNavigator {
 
     /**
      * Finds the root property that contains one or more identity properties, or contains fields.
-     * 
+     *
      * Usefull for schemas that are embedded in sub-properties like "item", "items", "{entity}" or ones that also emit meta data at the root level.
      */
     public get root(): { [property: string]: JsonSchema } {
@@ -108,7 +109,7 @@ export class SchemaNavigator {
 
     /**
      * Returns a map of all found id references in the schema.
-     * 
+     *
      * This method makes it easier to resolve embedded schemas by ids.
      */
     public getSchemaIdsWithPointers(): { [id: string]: string } {
@@ -138,8 +139,8 @@ export class SchemaNavigator {
 
     /**
      * Get whether the given field is an identity property.
-     * 
-     * @return The priority of the given property as an identifying property. 0 = Not an identity, 1 = Primary identity (Numeric: ID, Id, UId, {SchemaName}Id, ...), 2 = Secondary identity (ItemId, ItemUId, ...), 3 = Composite Primary identity (String/Numeric, name, ...) 
+     *
+     * @return The priority of the given property as an identifying property. 0 = Not an identity, 1 = Primary identity (Numeric: ID, Id, UId, {SchemaName}Id, ...), 2 = Secondary identity (ItemId, ItemUId, ...), 3 = Composite Primary identity (String/Numeric, name, ...)
      */
     protected isIdentityProperty(name: string): 1 | 2 | 3 | 0 {
         let lower = name.toLocaleLowerCase();

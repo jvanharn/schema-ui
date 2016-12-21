@@ -1,4 +1,4 @@
-import { JsonSchema } from './models/schema';
+import { JsonSchema } from '../models/schema';
 
 /**
  * Schema caching service interface.
@@ -25,9 +25,20 @@ export interface ISchemaCache {
     /**
      * Get a schema by a predicate.
      *
+     * Heavy operation, should be avoided at all cost.
+     *
      * @param predicate The predicate that will decide whether the given schema, is the schema you need.
      *
      * @return JsonSchema
      */
     getSchemaBy(predicate: (schema: JsonSchema) => boolean): JsonSchema;
+
+    /**
+     * Iterate over every schema in the cache.
+     *
+     * Heavy operation, should be avoided at all cost.
+     *
+     * @param predicate The operation that should be executed for every schema in the cache.
+     */
+    each(predicate: (schema: JsonSchema) => void): void;
 }

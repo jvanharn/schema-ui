@@ -1,4 +1,4 @@
-import { JsonSchema } from './models/index';
+import { JsonSchema } from '../models/schema';
 
 /**
  * Schema retrieval interface.

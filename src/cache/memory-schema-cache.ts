@@ -1,5 +1,5 @@
 import { JsonSchema } from '../models/schema';
-import { ISchemaCache } from '../schema-cache';
+import { ISchemaCache } from './schema-cache';
 
 /**
  * Schema caching service for fetched schema's.

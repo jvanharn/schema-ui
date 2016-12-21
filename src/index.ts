@@ -1,11 +1,9 @@
-import 'es6-promise/auto';
-
 export * from './models/index';
 
-export { ISchemaCache } from './schema-cache';
+export { ISchemaCache } from './cache/schema-cache';
 export { MemorySchemaCache } from './cache/memory-schema-cache';
 
-export { ISchemaFetcher } from './schema-fetcher';
+export { ISchemaFetcher } from './fetchers/schema-fetcher';
 
 export { SchemaNavigator } from './schema-navigator';
 export { SchemaAgent } from './schema-agent';
