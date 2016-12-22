@@ -48,4 +48,19 @@ export class MemorySchemaCache implements ISchemaCache {
         }
         return null;
     }
+
+    /**
+     * Iterate over every schema in the cache.
+     *
+     * Heavy operation, should be avoided at all cost.
+     *
+     * @param predicate The operation that should be executed for every schema in the cache.
+     */
+    public each(predicate: (schema: JsonSchema) => void): void {
+        for (var schema in this.schemas) {
+            if (this.schemas.hasOwnProperty(schema)) {
+                predicate(this.schemas[schema]);
+            }
+        }
+    }
 }
