@@ -9,6 +9,8 @@
     "build": "rm -rf dist/ && tsc"
   },
   "files": [
+    "dist/*",
+    "typings/*",
     "typings.json",
     "dist/json-schema-services.js",
     "dist/json-schema-services.d.ts"
