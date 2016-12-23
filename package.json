@@ -2,7 +2,7 @@
   "name": "json-schema-services",
   "version": "0.1.0",
   "description": "Library that makes it easy to work with JsonSchema-enabled services. Requires Promises (polyfill with es6-promise if not available on your platform).",
-  "main": "dist/json-schema-services.js",
+  "main": "dist/json-schema-services.amd.js",
   "typings": "dist/json-schema-services.d.ts",
   "scripts": {
     "test": "cd tests; jasmine",

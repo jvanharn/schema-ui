@@ -5,7 +5,7 @@
         "noImplicitAny": true,
         "removeComments": true,
         "preserveConstEnums": true,
-        "outFile": "dist/json-schema-services.js",
+        "outFile": "dist/json-schema-services.amd.js",
         "declaration": true,
         "sourceMap": true,
         "lib": ["es5", "es2015.promise"]
