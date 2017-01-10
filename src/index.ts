@@ -8,4 +8,6 @@ export { ISchemaFetcher } from './fetchers/schema-fetcher';
 export { NullSchemaFetcher } from './fetchers/null-schema-fetcher';
 
 export { SchemaNavigator } from './schema-navigator';
-export { SchemaAgent } from './schema-agent';
+
+export { ISchemaAgent } from './agents/schema-agent';
+export { EndpointSchemaAgent } from './agents/endpoint-schema-agent';
