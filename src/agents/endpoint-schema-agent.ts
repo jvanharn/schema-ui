@@ -1,6 +1,7 @@
-import { SchemaNavigator } from './schema-navigator';
-import { ISchemaCache } from './cache/schema-cache';
-import { ISchemaFetcher } from './fetchers/schema-fetcher';
+import { ISchemaAgent } from './schema-agent';
+import { SchemaNavigator } from '../schema-navigator';
+import { ISchemaCache } from '../cache/schema-cache';
+import { ISchemaFetcher } from '../fetchers/schema-fetcher';
 
 //@todo replace z-schema with a custom implementation in typescript.
 import zschema = require('z-schema');
@@ -11,11 +12,11 @@ import zschema = require('z-schema');
  * This class makes it possible to read a json-schema and load the links that are defined in it.
  * Makes it easy to use the links used in json-schemas as outlined in the JSON-Schema Hyper schema extension.
  */
-export class SchemaAgent {
+export class EndpointSchemaAgent implements ISchemaAgent {
     /**
      * Parent schema for this agent.
      */
-    public readonly parent: SchemaAgent;
+    public readonly parent: ISchemaAgent;
 
     /**
      * Path prefix for properties in this schema.
