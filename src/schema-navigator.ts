@@ -41,7 +41,7 @@ export class SchemaNavigator {
 
     /**
      * Document identity property.
-     * 
+     *
      * The "highest rated" identity property in the document. If none is found, just gives the first property in the document.
      */
     public get identityProperty(): string {
@@ -87,7 +87,7 @@ export class SchemaNavigator {
         return pointer.get(this.schema, this.schemaRootPrefix);
     }
 
-    
+
 
 //region CommonJsonSchema Helpers
     /**
@@ -96,17 +96,15 @@ export class SchemaNavigator {
      * When not set, the entity name is guessed based on the schema id.
      * @throws Error When the schema id and entity name are not set.
      */
-    public get entity(): string {
-        if (!!(this.schema as CommonJsonSchema).entity) {
-            return (this.schema as CommonJsonSchema).entity;
-        }
+    public get entity(): string | null {
+        return SchemaNavigator.getSchemaEntity(this.schema);
     }
 //endregion
 
 //region JsonFormSchema Helpers
     /**
      * Get all schema properties.
-     * 
+     *
      * @return Dictionary of property names and their JsonSchemas.
      */
     public get propertyRoot(): { [property: string]: JsonSchema } {
@@ -128,7 +126,7 @@ export class SchemaNavigator {
 
     /**
      * Check whether or not this is a form schema.
-     * 
+     *
      * An schema can be both a collection/table and a form.
      */
     public isForm(): boolean {
@@ -137,7 +135,7 @@ export class SchemaNavigator {
 
     /**
      * Finds the main form property list and returns the ones that qualify as visible fields.
-     * 
+     *
      * @return An dictionary of all visible fields in thi JsonFormSchema.
      */
     public get fields(): { [property: string]: JsonSchema } {
@@ -160,7 +158,7 @@ export class SchemaNavigator {
 //region JsonTableSchema Helpers
     /**
      * Check whether or not this schema is a schema for a paginated collection (e.g. a JsonTableSchema).
-     * 
+     *
      * An schema can be both a collection/table and a form.
      */
     public isCollection(): boolean {
@@ -270,6 +268,30 @@ export class SchemaNavigator {
 
         // Just assume the root is ok.
         return '/';
+    }
+
+    /**
+     * Get the name of the schema entity.
+     *
+     * @param schema The schema to get the entity for.
+     *
+     * @return The name of the schema or null.
+     */
+    public static getSchemaEntity(schema: JsonSchema): string | null {
+        if (!!(schema as CommonJsonSchema).entity) {
+            return (schema as CommonJsonSchema).entity;
+        }
+        if (!!schema.id) {
+            return this.convertSchemaIdToEntityName(schema.id);
+        }
+        return null;
+    }
+
+    /**
+     * Simple attempt at converting a schema id to an entity name without having the actual schema.
+     */
+    public static convertSchemaIdToEntityName(id: string): string {
+        return _.upperFirst(_.camelCase(_.last(_.split(id, '/'))));
     }
 }
 

@@ -2,9 +2,7 @@ import { ISchemaAgent } from './schema-agent';
 import { SchemaNavigator } from '../schema-navigator';
 import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
-
-//@todo replace z-schema with a custom implementation in typescript.
-import zschema = require('z-schema');
+import { SchemaValidator } from '../schema-validator';
 
 /**
  * Schema interpreter and "hyper/media-link" agent.
@@ -24,9 +22,9 @@ export class EndpointSchemaAgent implements ISchemaAgent {
     public path: string = '/';
 
     /**
-     * The Schema validator.
+     * Validate request-data before sending it to the server.
      */
-    private _validator: ZSchema.Validator;
+    public validateRequests: boolean = true;
 
     /**
      * Construct a new schema agent using a SchemaNavigator.
@@ -34,17 +32,16 @@ export class EndpointSchemaAgent implements ISchemaAgent {
      * @param schema The schema-navigator used to easily extract link information from the schema.
      * @param cache The schema cache to use to fetch schema's not currently known to the agent.
      * @param fetcher The fetcher to enable us to fetch schema's that are currently not available.
+     * @param validator The validator to help us validate incomming and outgoing requests before they are performed.
      */
     public constructor(
-        private schema: SchemaNavigator,
-        private cache: ISchemaCache,
-        private fetcher: ISchemaFetcher
+        private readonly schema: SchemaNavigator,
+        private readonly cache: ISchemaCache,
+        private readonly fetcher: ISchemaFetcher,
+        private readonly validator?: SchemaValidator
     ) {
-        this._validator = new zschema({
-            noExtraKeywords: false,
-            breakOnFirstError: false
-        });
+        if (validator == null) {
+            this.validator = new SchemaValidator(schema, cache, fetcher);
+        }
     }
-
-
 }
