@@ -20,6 +20,8 @@
   "author": "Jeffrey vH",
   "license": "MIT",
   "dependencies": {
+    "axios": "^0.15.3",
+    "debug": "^2.6.0",
     "json-pointer": "^0.6.0",
     "lodash": "^4.17.2",
     "z-schema": "^3.18.2"

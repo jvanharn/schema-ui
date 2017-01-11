@@ -184,6 +184,37 @@ export class SchemaNavigator {
             ? this.schema.links
             : new Array;
     }
+
+    /**
+     * Get a schema hyper(media)link by the relation type.
+     * 
+     * @param rel Name or 'relation' of the hyperlink.
+     * 
+     * @return The hyperlink descriptor object.
+     */
+    public getLink(rel: string): SchemaHyperlinkDescriptor {
+        return _.find(this.links, x => x.rel === rel);
+    }
+
+    /**
+     * Get a schema hyper(media)link by a ordered list of relation types.
+     * 
+     * This method will first look for the first link, if it doesnt find it, the next, etc untill it finds one or no relation names are left.
+     * 
+     * @param rels Relation names that should be searched for, in search order.
+     * 
+     * @return The hyperlink descriptor object.
+     */
+    public getFirstLink(rels: string[]): SchemaHyperlinkDescriptor {
+        let result: SchemaHyperlinkDescriptor
+        for (let rel of rels) {
+            result = this.getLink(rel);
+            if (result != null) {
+                break;
+            }
+        }
+        return result;
+    }
 //endregion
 
     /**

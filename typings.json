@@ -1,6 +1,10 @@
 {
   "dependencies": {
+    "debug": "registry:npm/debug#2.0.0+20160723033700",
     "json-pointer": "registry:dt/json-pointer#1.0.0+20160428043022",
     "lodash": "registry:npm/lodash#4.0.0+20161015015725"
+  },
+  "globalDependencies": {
+    "axios": "registry:dt/axios#0.9.1+20161128041239"
   }
 }

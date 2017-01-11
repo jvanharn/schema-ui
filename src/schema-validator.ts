@@ -214,6 +214,13 @@ export class SchemaValidator {
     private _cleanupIdentity(id: string): string {
         return _.head(id.split('#', 2));
     }
+
+    /**
+     * Shortcut method for creating an SchemaValidator.
+     */
+    public static fromSchema(schema: JsonSchema, cache?: ISchemaCache, fetcher?: ISchemaFetcher): SchemaValidator {
+        return new SchemaValidator(new SchemaNavigator(schema), cache, fetcher);
+    }
 }
 
 /**
