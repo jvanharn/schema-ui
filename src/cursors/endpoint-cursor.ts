@@ -1,10 +1,11 @@
-import { ICursor, CursorLoadingState } from './cursor';
+import { ICursor, CursorLoadingState, PageChangeEvent } from './cursor';
 
 import { SchemaHyperlinkDescriptor, IdentityValues } from '../models/index';
 
 import { ISchemaAgent, SchemaAgentResponse } from '../agents/schema-agent';
 import { EndpointSchemaAgent } from '../agents/endpoint-schema-agent';
 
+import { EventEmitter } from 'eventemitter3';
 import * as _ from 'lodash';
 import * as debuglib from 'debug';
 
@@ -14,10 +15,8 @@ var debug = debuglib('schema:endpoint:cursor');
  * Cursor that can traverse standardized endpoints.
  *
  * In order to be able to traverse an endpoint of this type, the endpoint needs to support:
- *
- * @event afterPageChange After a page change has ocurred.
  */
-export class EndpointCursor<T> implements ICursor<T> {
+export class EndpointCursor<T> extends EventEmitter implements ICursor<T> {
     //region get/set limit
         private _limit: number = 40;
 
@@ -121,7 +120,9 @@ export class EndpointCursor<T> implements ICursor<T> {
         limit?: number,
         private paginationInfoExtractor: PaginationInfoExtractorFunc = genericPaginationInfoExtractor,
         private paginationRequestGenerator: PaginationRequestGeneratorFunc = genericPaginationRequestGenerator
-    ) { }
+    ) {
+        super();
+    }
 
 //region Page changing
     /**
@@ -207,20 +208,28 @@ export class EndpointCursor<T> implements ICursor<T> {
         // Create urlData object from absolutely all data we can possibly find.
         let urlData = this.paginationRequestGenerator(page, this.limit);
 
+        // Emit event before the fetch
+        this.emit('beforePageChange', { page: page, items: null });
+
         // Execute the request.
         return this.agent
             .execute<void, any>(link, void 0, urlData)
             .then(response => {
                 this._current = page;
 
+                // Extract the request data
                 let info = this.paginationInfoExtractor<T>(response);
                 this._items = info.items || [];
                 this._totalPages = info.totalPages;
                 this._count = info.count;
 
+                // Some sanity checks
                 if (this.items.length > this.limit) {
                     debug(`[warn] The amount of items returned (${this.items.length}) by the agent/server/service was higher than the amount of requested items (${this.limit})!`);
                 }
+
+                // Emit event after the succesfull fetch
+                this.emit('afterPageChange', { page: this.current, items: this.items });
 
                 return info.items;
             });
@@ -244,11 +253,11 @@ export class EndpointCursor<T> implements ICursor<T> {
                     firstPage = Promise.resolve(this.items);
                 }
                 else {
-                    firstPage = new Promise(resolve => this.once('afterPageChange', x => resolve(x.Items)));
+                    firstPage = new Promise(resolve => this.once('afterPageChange', (x: PageChangeEvent<T>) => resolve(x.items)));
                 }
             }
             else {
-                firstPage = <any> this.select(1);
+                firstPage = this.select(1);
             }
 
             firstPage.then(items => {

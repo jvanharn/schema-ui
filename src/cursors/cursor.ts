@@ -1,11 +1,15 @@
 import { JsonSchema } from '../models/schema';
+import { EventEmitter } from 'eventemitter3';
 
 /**
  * Interface for iterating over a paginated datasource.
  *
  * Used for paginating over an resource collection, filtering it and displaying in tables.
+ *
+ * @event beforePageChange {PageChangeEvent} Before a page change has ocurred it gives the page we are going to change to.
+ * @event afterPageChange {PageChangeEvent} After a page change has ocurred.
  */
-export interface ICursor<T> {
+export interface ICursor<T> extends EventEmitter {
     /**
      * The page that the items collection currently reflects in the datasource.
      */
@@ -91,6 +95,18 @@ export interface ICursor<T> {
      * @return A promise resolving in all the items in this collection (Beware, this can pottentially be millions of items).
      */
     all(limit?: number): Promise<T[]>;
+
+    /**
+     * Event fired before the page is changed to another.
+     */
+    on(ev: 'beforePageChange', fn: (event: PageChangeEvent<T>) => void, ctx?: any): this;
+    once(ev: 'beforePageChange', fn: (event: PageChangeEvent<T>) => void, ctx?: any): this;
+
+    /**
+     * Event fired after the page is changed to another, with the new page number and the fetched items.
+     */
+    on(ev: 'afterPageChange', fn: (event: PageChangeEvent<T>) => void, ctx?: any): this;
+    once(ev: 'afterPageChange', fn: (event: PageChangeEvent<T>) => void, ctx?: any): this;
 }
 
 /**
@@ -116,4 +132,19 @@ export enum CursorLoadingState {
      * The cursor is empty, and the collection doesn't contain any items.
      */
     Empty
+}
+
+/**
+ * Defines an event that is fired when the page is chang[ing/ed].
+ */
+export interface PageChangeEvent<T> {
+    /**
+     * The page number that was loaded.
+     */
+    page: number;
+
+    /**
+     * The items that were fetched, or null when this is the before event.
+     */
+    items?: T[];
 }
