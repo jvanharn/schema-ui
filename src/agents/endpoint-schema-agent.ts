@@ -198,10 +198,11 @@ export class EndpointSchemaAgent implements ISchemaAgent {
         }
 
         // Execute the request
-        return this.execute(link, void 0, urlData).then(response => {
-            //@todo validate response.
-            return response.body;
-        });
+        return this.execute<any, T>(link, void 0, urlData)
+            .then(response => {
+                //@todo validate response.
+                return response.body;
+            });
     }
 
     /**
