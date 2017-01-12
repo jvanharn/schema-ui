@@ -309,14 +309,72 @@ export type PaginationRequestGeneratorFunc = <T>(page: number, limit: number) =>
 /**
  * Generic method for fetching pagination information from an agent response.
  */
-function genericPaginationInfoExtractor<T>(response: SchemaAgentResponse<any>): PaginationInfo<T> {
+export function genericPaginationInfoExtractor<T>(response: SchemaAgentResponse<any>): PaginationInfo<T> {
+    // Check the body
+    let result: Partial<PaginationInfo<T>> = genericPaginationInfoKeyExtractor<T>({}, response.body);
 
+    // Check the headers.
+    if (!_.isEmpty(response.headers)) {
+        result = genericPaginationInfoKeyExtractor(result, response.headers);
+    }
+
+    // Check the body sub-keys
+    let usable = _.findKey(response.body, (v, k) => _.includes(paginationMetaKeys, k.toLowerCase()));
+    if (!!usable) {
+        result = genericPaginationInfoKeyExtractor(result, response.body[usable]);
+    }
+
+    // Return whatever we have
+    return result as PaginationInfo<T>;
+}
+
+/**
+ * Helper method that will check for all needed properties in the given object.
+ */
+function genericPaginationInfoKeyExtractor<T>(partial: Partial<PaginationInfo<T>>, data: any): Partial<PaginationInfo<T>> {
+    // Try to set the item count.
+    for (let key of paginationCollectionCountProperties) {
+        if (_.isFinite(partial.count)) {
+            break;
+        }
+        partial.count = checkDataKey<number>(_.isFinite, data, key);
+    }
+
+    // Try to set the page count.
+    for (let key of paginationPageCountProperties) {
+        if (_.isFinite(partial.totalPages)) {
+            break;
+        }
+        partial.totalPages = checkDataKey<number>(_.isFinite, data, key);
+    }
+
+    // Try to set the items array.
+    for (let key of paginationPageItemsProperties) {
+        if (_.isFinite(partial.items)) {
+            break;
+        }
+        partial.items = checkDataKey<T[]>(_.isArray, data, key);
+    }
+
+    return partial;
+}
+
+/**
+ * Takes a validator, data and a key to check on, and checks it's presence in various formats and whether the value of that key is acceptable.
+ */
+function checkDataKey<T>(validator: (item: any) => boolean, data: any, key: string): T | null {
+    for (let testable of [key, _.snakeCase(key), _.kebabCase(key)]) {
+        if (data[key] != null && validator(data[key])) {
+            return data[key];
+        }
+    }
+    return null;
 }
 
 /**
  * Generic method for generating urlData for an agent request.
  */
-function genericPaginationRequestGenerator<T>(page: number, limit: number): IdentityValues {
+export function genericPaginationRequestGenerator<T>(page: number, limit: number): IdentityValues {
     let urlData: IdentityValues = { };
 
     // Set the possible variations of the page keyword.
@@ -369,4 +427,21 @@ const paginationPageCountProperties = [
 const paginationCollectionCountProperties = [
     'totalCount',
     'itemCount'
+];
+
+/**
+ * Properties that commonly identify an property or header that contains the total number of items in the collection.
+ */
+const paginationPageItemsProperties = [
+    'items',
+    'data',
+    'collection'
+];
+
+/**
+ * If the keywords needed for extracting info isnt in the root of the response, look in these objects.
+ */
+const paginationMetaKeys = [
+    'pagination',
+    'meta'
 ];
