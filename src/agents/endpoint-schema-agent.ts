@@ -41,11 +41,6 @@ export class EndpointSchemaAgent implements ISchemaAgent {
     public static DefaultBaseUrl: string = '/';
 
     /**
-     * Method to extract the response identity.
-     */
-    public static DefaultResponseIdentityExtractor: ResponseIdentityExtractorFunc = genericResponseIdentityExtractor;
-
-    /**
      * Parent schema for this agent.
      */
     public readonly parent: ISchemaAgent;
@@ -77,8 +72,7 @@ export class EndpointSchemaAgent implements ISchemaAgent {
         public readonly schema: SchemaNavigator,
         private readonly cache: ISchemaCache,
         private readonly fetcher: ISchemaFetcher,
-        private readonly validator?: SchemaValidator,
-        private responseIdentityExtractor: ResponseIdentityExtractorFunc = EndpointSchemaAgent.DefaultResponseIdentityExtractor;
+        private readonly validator?: SchemaValidator
     ) {
         if (validator == null) {
             this.validator = new SchemaValidator(schema, cache, fetcher);
@@ -153,13 +147,7 @@ export class EndpointSchemaAgent implements ISchemaAgent {
         }
 
         // Execute the request
-        return this.execute<T, any>(link, void 0, urlData)
-            .then(response => {
-                if (!this.responseIdentityExtractor) {
-                    return response.body['id'];
-                }
-                return this.responseIdentityExtractor(this.schema, response);
-            });
+        return this.execute<T, any>(link, void 0, urlData).then(response => this.schema.getIdentityValue(response.body));
     }
 
     /**
@@ -272,7 +260,31 @@ export class EndpointSchemaAgent implements ISchemaAgent {
      * @return A promise that resolves once the item is succesfully deleted.
      */
     public delete(identity: IdentityValue, linkName?: string, urlData?: IdentityValues): Promise<void> {
+        // Try to fetch the link name
+        let link = this.chooseAppropriateLink([
+            'read', // The name this library propagates.
+            'self', // The official rel name for this kind of method (but not very common).
+            'item', // Defined in the Item and Collection rfc6573
+            'view',
+            'get',
+            'current'
+        ], linkName);
+        if (!link) {
+            return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
+        }
 
+        // Determine url data
+        if (!_.isPlainObject(urlData)) {
+            urlData = {};
+        }
+        urlData[this.schema.identityProperty] = identity as string;
+
+        // Execute the request
+        return this.execute<any, void>(link, void 0, urlData)
+            .then(response => {
+                //@todo determine the response was positive. probably is, because it didnt reject?.
+                return void 0;
+            });
     }
 
     /**
@@ -350,17 +362,4 @@ export class EndpointSchemaAgent implements ISchemaAgent {
         }
         return this.schema.getFirstLink(defaults);
     }
-}
-
-/**
- * Function that takes the response from the server/service and finds the identity value from the response (SHOULD be a create response).
- */
-export type ResponseIdentityExtractorFunc = (schema: SchemaNavigator, response: SchemaAgentResponse<any>) => IdentityValue;
-
-/**
- * Simple method for finding the identity property in an response body.
- */
-export function genericResponseIdentityExtractor(schema: SchemaNavigator, response: SchemaAgentResponse<any>): IdentityValue {
-    // @todo use the schema.
-    return _.find(response.body as { [key: string]: string | number }, (v, k) => k.toLowerCase().indexOf('id') > 0);
 }

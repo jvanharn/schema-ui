@@ -15,8 +15,7 @@ export interface JsonTableSchema extends CommonJsonSchema {
 /**
  * Schema column descriptor
  */
-export interface SchemaColumnDescriptor
-{
+export interface SchemaColumnDescriptor {
     /**
      * The internal identifier for the column.
      */

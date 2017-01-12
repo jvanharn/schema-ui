@@ -8,6 +8,9 @@ import {
     JsonTableSchema,
     CommonJsonSchema,
 
+    IdentityValue,
+    IdentityValues,
+
     SchemaHyperlinkDescriptor,
     SchemaColumnDescriptor
 } from './models/index';
@@ -86,8 +89,6 @@ export class SchemaNavigator {
     public get root(): JsonSchema | JsonFormSchema | JsonTableSchema {
         return pointer.get(this.schema, this.schemaRootPrefix);
     }
-
-
 
 //region CommonJsonSchema Helpers
     /**
@@ -216,6 +217,50 @@ export class SchemaNavigator {
             if (result != null) {
                 break;
             }
+        }
+        return result;
+    }
+//endregion
+
+//region JSON-Pointer helpers
+    /**
+     * Get property or field value.
+     * 
+     * @param name The name of the property to fetch.
+     * @param data The data object to fetch the property from.
+     * 
+     * @return The value of the property or undefined if not set.
+     */
+    public getPropertyValue(name: string, data: any): any {
+        let prop = _.findKey(this.propertyRoot, (v, k) => k.toLowerCase() === name.toLowerCase())
+        if (prop == null) {
+            return void 0;
+        }
+        return pointer.get(data, this.propertyPrefix + prop);
+    }
+
+    /**
+     * Get the identity value for the given data.
+     * 
+     * @param data The data to fetch the identity property value from.
+     * 
+     * @return The identity property value.
+     */
+    public getIdentityValue(data: any): IdentityValue {
+        return this.getPropertyValue(this.identityProperty, data);
+    }
+
+    /**
+     * Get all identity property values found in the schema.
+     * 
+     * @param data The data to fetch the identity property values from.
+     * 
+     * @return The identity property value dictionary.
+     */
+    public getIdentityValues(data: any): IdentityValues {
+        let result: IdentityValues = { };
+        for (let prop in this.identityProperties) {
+            result[prop] = this.getPropertyValue(this.identityProperty, data);
         }
         return result;
     }
