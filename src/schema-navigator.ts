@@ -260,7 +260,7 @@ export class SchemaNavigator {
     public getIdentityValues(data: any): IdentityValues {
         let result: IdentityValues = { };
         for (let prop in this.identityProperties) {
-            result[prop] = this.getPropertyValue(this.identityProperty, data);
+            result[prop] = this.getPropertyValue(prop, data);
         }
         return result;
     }
