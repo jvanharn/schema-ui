@@ -175,6 +175,7 @@ export class SchemaValidator {
                         if (!!(defs[i] as CommonJsonSchema).entity && !def.definitions[(defs[i] as CommonJsonSchema).entity]) {
                             key = (defs[i] as CommonJsonSchema).entity;
                         }
+                        // If that was already attempted, try getting the last part of the relative part (if that's set).
                         else if ((hashIndex = defs[i].id.lastIndexOf('#')) > 0 && (slashIndex = defs[i].id.lastIndexOf('/', hashIndex)) > 0) {
                             key = defs[i].id.substr(slashIndex);
                         }

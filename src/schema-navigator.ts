@@ -187,9 +187,11 @@ export class SchemaNavigator {
 
     /**
      * Get a schema hyper(media)link by the relation type.
-     * 
+     *
+     * @link https://tools.ietf.org/html/rfc5988#section-6.2.2 See this page for official 'rel' value names.
+     *
      * @param rel Name or 'relation' of the hyperlink.
-     * 
+     *
      * @return The hyperlink descriptor object.
      */
     public getLink(rel: string): SchemaHyperlinkDescriptor {
@@ -198,11 +200,13 @@ export class SchemaNavigator {
 
     /**
      * Get a schema hyper(media)link by a ordered list of relation types.
-     * 
+     *
      * This method will first look for the first link, if it doesnt find it, the next, etc untill it finds one or no relation names are left.
-     * 
+     *
+     * @link https://tools.ietf.org/html/rfc5988#section-6.2.2 See this page for official 'rel' value names.
+     *
      * @param rels Relation names that should be searched for, in search order.
-     * 
+     *
      * @return The hyperlink descriptor object.
      */
     public getFirstLink(rels: string[]): SchemaHyperlinkDescriptor {

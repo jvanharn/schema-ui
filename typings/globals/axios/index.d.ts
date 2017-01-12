@@ -215,17 +215,17 @@ declare namespace Axios {
         /**
          * Send request as configured
          */
-        <T>(config: AxiosXHRConfig<T>): IPromise<AxiosXHR<T>>;
+        <TRequest, TResponse>(config: AxiosXHRConfig<TRequest>): IPromise<AxiosXHR<TResponse>>;
 
         /**
          * Send request as configured
          */
-        new <T>(config: AxiosXHRConfig<T>): IPromise<AxiosXHR<T>>;
+        new <TRequest, TResponse>(config: AxiosXHRConfig<TRequest>): IPromise<AxiosXHR<TResponse>>;
 
         /**
          * Send request as configured
          */
-        request<T>(config: AxiosXHRConfig<T>): IPromise<AxiosXHR<T>>;
+        request<TRequest, TResponse>(config: AxiosXHRConfig<TRequest>): IPromise<AxiosXHR<TResponse>>;
 
         /**
          * intercept requests or responses before they are handled by then or catch

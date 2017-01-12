@@ -34,7 +34,7 @@ declare namespace ZSchema {
     }
 
     export class Validator {
-    
+
         /**
          * Register a custom format.
          *
@@ -50,7 +50,7 @@ declare namespace ZSchema {
          * @param name - name of the custom format
          */
         public static unregisterFormat(name: string): void;
-        
+
         /**
          * Get the list of all registered formats.
          *
@@ -60,9 +60,9 @@ declare namespace ZSchema {
          * @returns {string[]} the list of all registered format names.
          */
         public static getRegisteredFormats(): string[];
-        
+
         public static getDefaultOptions(): Options;
-    
+
         constructor(options: Options);
 
         /**
@@ -86,6 +86,8 @@ declare namespace ZSchema {
 
         getLastError(): SchemaError;
         getLastErrors(): SchemaError[];
+
+        setRemoteReference(ref: string, schema: any): void;
     }
 }
 

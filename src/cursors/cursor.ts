@@ -23,11 +23,6 @@ export interface ICursor<T> {
     readonly count: number;
 
     /**
-     * Max items in the datasource.
-     */
-    readonly maxItems: number;
-
-    /**
      * Total number of pages in the datasource.
      */
     readonly totalPages: number;
@@ -90,6 +85,8 @@ export interface ICursor<T> {
      * Get all the items inside the collection as a promised list.
      *
      * As some collections may contain millions of items, please *always* check the total count of the collection first.
+     *
+     * @param limit The maximum amount of items per page to use during the fetching of all pages.
      *
      * @return A promise resolving in all the items in this collection (Beware, this can pottentially be millions of items).
      */

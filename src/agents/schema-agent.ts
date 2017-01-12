@@ -124,5 +124,22 @@ export interface ISchemaAgent {
      *
      * @return An promise resolving into the decoded response from the server/service/remote.
      */
-    execute(link: SchemaHyperlinkDescriptor, data?: any, urlData?: IdentityValues): Promise<any>;
+    execute<TRequest, TResponse>(link: SchemaHyperlinkDescriptor, data?: TRequest, urlData?: IdentityValues, headers?: HeaderDictionary): Promise<SchemaAgentResponse<TResponse>>;
 }
+
+/**
+ * Object that is returned
+ */
+export interface SchemaAgentResponse<T> {
+    /**
+     * Headers or other meta information send with the request, which was not part of the body.
+     */
+    headers: HeaderDictionary;
+
+    /**
+     * The response body.
+     */
+    body: T;
+}
+
+export type HeaderDictionary = { [header: string]: string };

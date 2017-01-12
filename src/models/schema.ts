@@ -1,7 +1,7 @@
 
 /**
  * Json schema interface with hypermedia extensions.
- * 
+ *
  * @link http://json-schema.org/latest/json-schema-core.html
  */
 export interface JsonSchema {
@@ -17,10 +17,10 @@ export interface JsonSchema {
 
     /**
      * Identity of the schema.
-     * 
+     *
      * The "id" keyword defines a URI for the schema, and the base URI that other URI references within the schema are resolved against. The "id" keyword itself is resolved against the base URI that the object as a whole appears in.
-     * 
-     * If present, the value for this keyword MUST be a string, and MUST represent a valid URI-reference [RFC3986]. This value SHOULD be normalized, and SHOULD NOT be an empty fragment <#> or an empty string <>. 
+     *
+     * If present, the value for this keyword MUST be a string, and MUST represent a valid URI-reference [RFC3986]. This value SHOULD be normalized, and SHOULD NOT be an empty fragment <#> or an empty string <>.
      */
     id: string;
 
@@ -119,14 +119,14 @@ export interface JsonSchema {
 //region Array
     /**
      * The minimum amount of items in an array.
-     * 
+     *
      * Only for array types.
      */
     minItems?: number;
 
     /**
      * The maximum amount of items in an array.
-     * 
+     *
      * Only for array types.
      */
     maxItems?: number;
@@ -204,19 +204,19 @@ export interface JsonSchema {
 }
 
 /**
- * The "media" property indicates that this instance contains non-JSON data encoded in a JSON string. It describes the type of content and how it is encoded. 
+ * The "media" property indicates that this instance contains non-JSON data encoded in a JSON string. It describes the type of content and how it is encoded.
  */
 export interface SchemaMediaDescriptor {
     /**
      * If the instance value is a string, this property defines that the string SHOULD be interpreted as binary data
      * and decoded using the encoding named by this property.
-     * 
-     * RFC 2045, Sec 6.1 [RFC2045] lists the possible values for this property. 
+     *
+     * RFC 2045, Sec 6.1 [RFC2045] lists the possible values for this property.
      */
     binaryEncoding: string;
 
     /**
-     * 
+     *
      */
     type: string;
 }
@@ -224,9 +224,10 @@ export interface SchemaMediaDescriptor {
 export interface SchemaHyperlinkDescriptor {
     /**
      * Descriptor for the related resource type.
-     * 
+     *
      * Should be from the curated list inside the RFC5988 (should be referenced from there).
      * @link https://tools.ietf.org/html/rfc5988#section-6.2.2
+     * @link http://www.iana.org/assignments/link-relations/link-relations.xhtml
      */
     rel: string;
 
@@ -257,7 +258,7 @@ export interface SchemaHyperlinkDescriptor {
 
     /**
      * Title for the link.
-     * 
+     *
      * Can be used to display the resource as a link by the useragent.
      */
     title?: string;

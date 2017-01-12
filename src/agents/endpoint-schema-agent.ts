@@ -7,7 +7,7 @@ import {
     IdentityValue,
     IdentityValues
 } from '../models/index';
-import { ISchemaAgent } from './schema-agent';
+import { ISchemaAgent, SchemaAgentResponse, HeaderDictionary } from './schema-agent';
 import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
 import { ICursor } from '../cursors/cursor';
@@ -38,7 +38,9 @@ export class EndpointSchemaAgent implements ISchemaAgent {
     /**
      * The default base url of new instances of the EndpointSchemaAgent.
      */
-    public static DefaultBaseUrl = '/';
+    public static DefaultBaseUrl: string = '/';
+
+    public static DefaultResponseIdentityExtractor
 
     /**
      * Parent schema for this agent.
@@ -89,15 +91,14 @@ export class EndpointSchemaAgent implements ISchemaAgent {
      *
      * @return An promise resolving into the decoded response from the server/service/remote.
      */
-    public execute<TRequest>(link: SchemaHyperlinkDescriptor, data?: TRequest, urlData?: IdentityValues, headers?: { [header: string]: string }): Promise<any> {
+    public execute<TRequest, TResponse>(link: SchemaHyperlinkDescriptor, data?: TRequest, urlData?: IdentityValues, headers?: HeaderDictionary): Promise<SchemaAgentResponse<TResponse>> {
         // Resolve the request schema
         return this.resolveLinkRequestSchema(link)
             .then(requestSchema => {
                 // Validate using the request schema (if applicable).
                 if (requestSchema != null) {
                     let validator = SchemaValidator.fromSchema(requestSchema, this.cache, this.fetcher);
-                    return validator
-                        .validate(data);
+                    return validator.validate(data);
                 }
             })
             .then(validation => {
@@ -105,7 +106,7 @@ export class EndpointSchemaAgent implements ISchemaAgent {
                 if (validation != null && !validation.valid) {
                     let message = `Unable to send the message using link "${link.rel}", the request-body was not formatted correctly according to the request-schema included in the link definition.`;
                     debug(message, validation.errors);
-                    return Promise.reject(message);
+                    throw new Error(message);
                 }
 
                 // Create the config
@@ -117,7 +118,13 @@ export class EndpointSchemaAgent implements ISchemaAgent {
                 };
 
                 // Return the created request
-                return axios.request(config);
+                return axios<TRequest, TResponse>(config) as Promise<Axios.AxiosXHR<TResponse>>;
+            })
+            .then(xhr => {
+                return {
+                    headers: xhr.headers,
+                    body: xhr.data
+                };
             });
     }
 
@@ -127,9 +134,26 @@ export class EndpointSchemaAgent implements ISchemaAgent {
      * @param item Values for the item to create.
      * @param urlData (Optionally) Data object to resolve parameters from the url in. If not set, uses the data/item object.
      * @param linkName The name of the link to use to create the item with.
+     *
+     * @return Promise that resolves into the id of the created product.
      */
     public create<T>(item: T, urlData?: IdentityValues, linkName?: string): Promise<IdentityValue> {
+        // Try to fetch the link name
+        let link = this.chooseAppropriateLink([
+            'create', // The name this library propagates.
+            'new',
+            'create-form'
+        ], linkName);
+        if (!link) {
+            return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
+        }
 
+        // Execute the request
+        return this.execute<T, any>(link, void 0, urlData)
+            .then(response => {
+                //@todo use a generic identity extractor.
+                return response.body['id'];
+            });
     }
 
     /**
@@ -145,18 +169,14 @@ export class EndpointSchemaAgent implements ISchemaAgent {
     public read<T>(urlData: IdentityValues, linkName?: string): Promise<T>;
     public read<T>(data: IdentityValue | IdentityValues, linkName?: string): Promise<T> {
         // Try to fetch the link name
-        let link: SchemaHyperlinkDescriptor;
-        if (_.isString(linkName)) {
-            link = this.schema.getLink(linkName);
-        }
-        else {
-            link = this.schema.getFirstLink([
-                'read', // The name this library propagates.
-                'self', // The official rel name for this kind of method (but not very common).
-                'view',
-                'get'
-            ]);
-        }
+        let link = this.chooseAppropriateLink([
+            'read', // The name this library propagates.
+            'self', // The official rel name for this kind of method (but not very common).
+            'item', // Defined in the Item and Collection rfc6573
+            'view',
+            'get',
+            'current'
+        ], linkName);
         if (!link) {
             return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
         }
@@ -274,10 +294,10 @@ export class EndpointSchemaAgent implements ISchemaAgent {
 
     /**
      * Takes a href (e.g. /api/user/{UserId}) and fills in all the parameters, using the data object.
-     * 
+     *
      * @param href The Href from the schema to resolve, for the given data object.
      * @param data The data object to fetch the values for the parameters from.
-     * 
+     *
      * @return The processed url that can be loaded.
      */
     private fillSchemaHyperlinkParameters(href: string, data: any): string {
@@ -309,5 +329,15 @@ export class EndpointSchemaAgent implements ISchemaAgent {
             return this.baseUrl + '/' + url;
         }
         return this.baseUrl + url;
+    }
+
+    /**
+     * Helper method to find the correct schema hyperlink for the job.
+     */
+    private chooseAppropriateLink(defaults: string[], userRel?: string): SchemaHyperlinkDescriptor | null {
+        if (_.isString(userRel)) {
+            return this.schema.getLink(userRel);
+        }
+        return this.schema.getFirstLink(defaults);
     }
 }
