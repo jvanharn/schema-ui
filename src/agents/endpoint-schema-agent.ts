@@ -40,7 +40,10 @@ export class EndpointSchemaAgent implements ISchemaAgent {
      */
     public static DefaultBaseUrl: string = '/';
 
-    public static DefaultResponseIdentityExtractor
+    /**
+     * Method to extract the response identity.
+     */
+    public static DefaultResponseIdentityExtractor: ResponseIdentityExtractorFunc = genericResponseIdentityExtractor;
 
     /**
      * Parent schema for this agent.
@@ -74,7 +77,8 @@ export class EndpointSchemaAgent implements ISchemaAgent {
         public readonly schema: SchemaNavigator,
         private readonly cache: ISchemaCache,
         private readonly fetcher: ISchemaFetcher,
-        private readonly validator?: SchemaValidator
+        private readonly validator?: SchemaValidator,
+        private responseIdentityExtractor: ResponseIdentityExtractorFunc = EndpointSchemaAgent.DefaultResponseIdentityExtractor;
     ) {
         if (validator == null) {
             this.validator = new SchemaValidator(schema, cache, fetcher);
@@ -151,8 +155,10 @@ export class EndpointSchemaAgent implements ISchemaAgent {
         // Execute the request
         return this.execute<T, any>(link, void 0, urlData)
             .then(response => {
-                //@todo use a generic identity extractor.
-                return response.body['id'];
+                if (!this.responseIdentityExtractor) {
+                    return response.body['id'];
+                }
+                return this.responseIdentityExtractor(this.schema, response);
             });
     }
 
@@ -192,7 +198,10 @@ export class EndpointSchemaAgent implements ISchemaAgent {
         }
 
         // Execute the request
-        return this.execute(link, void 0, urlData);
+        return this.execute(link, void 0, urlData).then(response => {
+            //@todo validate response.
+            return response.body;
+        });
     }
 
     /**
@@ -340,4 +349,17 @@ export class EndpointSchemaAgent implements ISchemaAgent {
         }
         return this.schema.getFirstLink(defaults);
     }
+}
+
+/**
+ * Function that takes the response from the server/service and finds the identity value from the response (SHOULD be a create response).
+ */
+export type ResponseIdentityExtractorFunc = (schema: SchemaNavigator, response: SchemaAgentResponse<any>) => IdentityValue;
+
+/**
+ * Simple method for finding the identity property in an response body.
+ */
+export function genericResponseIdentityExtractor(schema: SchemaNavigator, response: SchemaAgentResponse<any>): IdentityValue {
+    // @todo use the schema.
+    return _.find(response.body as { [key: string]: string | number }, (v, k) => k.toLowerCase().indexOf('id') > 0);
 }
