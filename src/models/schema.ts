@@ -238,6 +238,9 @@ export interface SchemaHyperlinkDescriptor {
 
     /**
      * The url which points to the linked resource.
+     *
+     * Can contain parameters and the like. It uses RFC6570 with some extra rules.
+     * @link https://tools.ietf.org/html/rfc6570 RFC6570 - URI Templates
      */
     href: string;
 

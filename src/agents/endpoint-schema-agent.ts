@@ -110,7 +110,7 @@ export class EndpointSchemaAgent implements ISchemaAgent {
                 // Create the config
                 let config: Axios.AxiosXHRConfig<TRequest> = {
                     // Resolve the url and set the url data.
-                    url: this.fillSchemaHyperlinkParameters(link.href, urlData || data),
+                    url: this.rebaseSchemaHyperlinkHref(this.fillSchemaHyperlinkParameters(link.href, urlData || data)),
                     method: link.method || 'GET',
                     //@todo Design a system that can modify the headers on a per-request, per-schema basis.
                 };
@@ -218,7 +218,15 @@ export class EndpointSchemaAgent implements ISchemaAgent {
      * @return A promise resolving into the requested cursor.
      */
     public list<T>(page?: number, limit?: number, linkName?: string, urlData?: IdentityValues): Promise<ICursor<T>> {
-
+        // Try to fetch the link name
+        let link = this.chooseAppropriateLink([
+            'list',
+            'collection',
+            'search'
+        ], linkName);
+        if (!link) {
+            return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
+        }
     }
 
     /**
@@ -324,7 +332,7 @@ export class EndpointSchemaAgent implements ISchemaAgent {
      */
     private fillSchemaHyperlinkParameters(href: string, data: any): string {
         // Fetch params
-        var params = this.rebaseSchemaHyperlinkHref(href).match(urlParameterMatchRegexp);
+        var params = href.match(urlParameterMatchRegexp);
         if(!params || params.length === 0) {
             return href;
         }
