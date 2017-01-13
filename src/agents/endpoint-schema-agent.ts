@@ -227,6 +227,8 @@ export class EndpointSchemaAgent implements ISchemaAgent {
         if (!link) {
             return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
         }
+
+        //@todo
     }
 
     /**
