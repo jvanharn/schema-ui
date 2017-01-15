@@ -1,4 +1,5 @@
 import { ICursor, CursorLoadingState, PageChangeEvent } from './cursor';
+import { ISearchableCursor } from './searchable-cursor';
 
 import { SchemaHyperlinkDescriptor, IdentityValues } from '../models/index';
 
@@ -16,7 +17,17 @@ var debug = debuglib('schema:endpoint:cursor');
  *
  * In order to be able to traverse an endpoint of this type, the endpoint needs to support:
  */
-export class EndpointCursor<T> extends EventEmitter implements ICursor<T> {
+export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISearchableCursor<T> {
+    /**
+     * The default name for a search term.
+     */
+    public static globalSearchTermProperty: string = 'search';
+
+    /**
+     * Search term property name. (Where to place generic search terms.)
+     */
+    public searchTermProperty: string = EndpointCursor.globalSearchTermProperty;
+
     //region get/set limit
         private _limit: number = 40;
 
@@ -207,6 +218,9 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T> {
 
         // Create urlData object from absolutely all data we can possibly find.
         let urlData = this.paginationRequestGenerator(page, this.limit);
+        if (!_.isEmpty(this.terms)) {
+            urlData[this.searchTermProperty] = this.terms;
+        }
 
         // Emit event before the fetch
         this.emit('beforePageChange', { page: page, items: null });
@@ -274,6 +288,25 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T> {
             });
         });
     }
+
+//region ISearchableCursor implementation
+    public _terms: string;
+
+    /**
+     * Currently active search terms.
+     */
+    public get terms(): string {
+        return this._terms;
+    }
+
+    /**
+     * Used to execute a page request with an active search filter.
+     */
+    public search(terms: string, initialPage: number = 1): Promise<T[]> {
+        this._terms = terms;
+        this.select(initialPage);
+    }
+//endregion
 }
 
 /**

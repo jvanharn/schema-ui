@@ -13,6 +13,7 @@ import { ISchemaFetcher } from '../fetchers/schema-fetcher';
 import { ICursor } from '../cursors/cursor';
 import { CollectionFilterDescriptor } from '../cursors/filterable-cursor';
 import { CollectionSortDescriptor } from '../cursors/sortable-cursor';
+import { EndpointCursor } from '../cursors/endpoint-cursor';
 
 import { SchemaNavigator } from '../schema-navigator';
 import { SchemaValidator } from '../schema-validator';
@@ -96,6 +97,7 @@ export class EndpointSchemaAgent implements ISchemaAgent {
                 // Validate using the request schema (if applicable).
                 if (requestSchema != null) {
                     let validator = SchemaValidator.fromSchema(requestSchema, this.cache, this.fetcher);
+                    debug(`Validating request with link "${link.rel}" from schema "${this.schema.root.id}" with it's request schema.`);
                     return validator.validate(data);
                 }
             })
@@ -119,6 +121,7 @@ export class EndpointSchemaAgent implements ISchemaAgent {
                 return axios<TRequest, TResponse>(config) as Promise<Axios.AxiosXHR<TResponse>>;
             })
             .then(xhr => {
+                debug(`Request with link "${link.rel}" from schema "${this.schema.root.id}" has been completed.`);
                 return {
                     headers: xhr.headers,
                     body: xhr.data
@@ -200,7 +203,19 @@ export class EndpointSchemaAgent implements ISchemaAgent {
      * @param sorters
      */
     public filter<T>(filters: CollectionFilterDescriptor[], sorters: CollectionSortDescriptor[]): Promise<ICursor<T>> {
+        // Try to fetch the link name
+        let link = this.schema.getFirstLink([
+            'list',
+            'collection',
+            'search'
+        ]);
+        if (!link) {
+            return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
+        }
 
+        let cursor = new EndpointCursor<T>(this, link.rel, null, void 0);
+        //@todo actually filter.
+        return Promise.resolve(cursor);
     }
 
     /**
@@ -228,7 +243,7 @@ export class EndpointSchemaAgent implements ISchemaAgent {
             return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
         }
 
-        //@todo
+        return Promise.resolve(new EndpointCursor<T>(this, link.rel, page, limit));
     }
 
     /**
@@ -257,7 +272,7 @@ export class EndpointSchemaAgent implements ISchemaAgent {
     public update(identity: IdentityValue, ops: JsonPatchOperation[], linkName?: string, urlData?: IdentityValues): Promise<void>;
     public update<T extends { }>(identity: IdentityValue, item: T, linkName?: string, urlData?: IdentityValues): Promise<void>;
     public update<T extends { }>(identity: IdentityValue, data: T | JsonPatchOperation[], linkName?: string, urlData?: IdentityValues): Promise<void> {
-
+        
     }
 
 
