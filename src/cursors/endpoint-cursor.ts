@@ -9,7 +9,6 @@ import { EndpointSchemaAgent } from '../agents/endpoint-schema-agent';
 import { EventEmitter } from 'eventemitter3';
 import * as _ from 'lodash';
 import * as debuglib from 'debug';
-
 var debug = debuglib('schema:endpoint:cursor');
 
 /**
@@ -133,6 +132,13 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
         private paginationRequestGenerator: PaginationRequestGeneratorFunc = genericPaginationRequestGenerator
     ) {
         super();
+        if (limit != null && limit >= 1) {
+            this._limit = limit;
+        }
+        if (initialPage != null && initialPage >= 1) {
+            debug(`loaded initial page ${initialPage} for [${this.agent.schema.root.id}]->{${this.linkName}}`);
+            this.select(initialPage);
+        }
     }
 
 //region Page changing
@@ -194,7 +200,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
     public select(page: number, forceReload: boolean = false): Promise<T[]> {
         // Check pagenumber validity
         if (!_.isInteger(page) || page < 1) {
-            throw new Error('Pagenumber has to be an integer of 1 or higher.');
+            return Promise.reject(new Error('Pagenumber has to be an integer of 1 or higher.'));
         }
         if (page === this.current && !forceReload) {
             return Promise.resolve(this.items);
@@ -213,7 +219,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
             ]);
         }
         if (!link) {
-            throw new Error('Unable to find a link for this cursor to fetch any pages.');
+            return Promise.reject(new Error('Unable to find a link for this cursor to fetch any pages.'));
         }
 
         // Create urlData object from absolutely all data we can possibly find.
@@ -226,27 +232,34 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
         this.emit('beforePageChange', { page: page, items: null });
 
         // Execute the request.
-        return this.agent
-            .execute<void, any>(link, void 0, urlData)
-            .then(response => {
-                this._current = page;
+        return new Promise<T[]>((resolve, reject) => {
+            this.agent
+                .execute<void, any>(link, void 0, urlData)
+                .then(response => {
+                    this._current = page;
 
-                // Extract the request data
-                let info = this.paginationInfoExtractor<T>(response);
-                this._items = info.items || [];
-                this._totalPages = info.totalPages;
-                this._count = info.count;
+                    // Extract the request data
+                    let info = this.paginationInfoExtractor<T>(response);
+                    this._items = info.items || [];
+                    this._totalPages = info.totalPages;
+                    this._count = info.count;
 
-                // Some sanity checks
-                if (this.items.length > this.limit) {
-                    debug(`[warn] The amount of items returned (${this.items.length}) by the agent/server/service was higher than the amount of requested items (${this.limit})!`);
-                }
+                    // Some sanity checks
+                    if (this.items.length > this.limit) {
+                        debug(`[warn] The amount of items returned (${this.items.length}) by the agent/server/service was higher than the amount of requested items (${this.limit})!`);
+                    }
 
-                // Emit event after the succesfull fetch
-                this.emit('afterPageChange', { page: this.current, items: this.items });
+                    // Emit event after the succesfull fetch
+                    this.emit('afterPageChange', { page: this.current, items: this.items });
 
-                return info.items;
-            });
+                    resolve(info.items);
+                })
+                .catch(err => {
+                    debug(`error ocurred whilst trying to fetch page (${page}/${this.totalPages}) limit: ${this.limit} of [${this.agent.schema.root.id}].`);
+                    this.emit('error', err);
+                    reject(err);
+                });
+        });
     }
 //endregion
 
@@ -262,30 +275,36 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
     public all(limit?: number): Promise<T[]> {
         return new Promise((resolve, reject) => {
             var firstPage: Promise<T[]>;
+            debug(`fetching all pages of cursor for [${this.agent.schema.root.id}]->{${this.linkName}}`);
             if (this.loadingState > CursorLoadingState.Uninitialized) {
                 if (this.loadingState === CursorLoadingState.Ready) {
+                    debug(`cursor{${this.linkName}} firstpage already loaded`);
                     firstPage = Promise.resolve(this.items);
                 }
                 else {
+                    debug(`cursor{${this.linkName}} firstpage loaded on afterPageChange event`);
                     firstPage = new Promise(resolve => this.once('afterPageChange', (x: PageChangeEvent<T>) => resolve(x.items)));
                 }
             }
             else {
+                debug(`cursor{${this.linkName}} firstpage loaded by select(1)`);
                 firstPage = this.select(1);
             }
 
-            firstPage.then(items => {
-                var promises: Promise<T[]>[] = [Promise.resolve(this.items)];
-                for (var i = 2; i <= this.totalPages; i++) {
-                    promises.push(this.select(i));
-                }
-                Promise
-                    .all(promises)
-                    .then(result => {
-                        resolve(_.flatten(result));
-                    })
-                    .catch(reject);
-            });
+            firstPage
+                .then(items => {
+                    var promises: Promise<T[]>[] = [Promise.resolve(this.items)];
+                    for (var i = 2; i <= this.totalPages; i++) {
+                        promises.push(this.select(i));
+                    }
+                    Promise
+                        .all(promises)
+                        .then(result => {
+                            resolve(_.flatten(result));
+                        })
+                        .catch(reject);
+                })
+                .catch(reject);
         });
     }
 
@@ -304,7 +323,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
      */
     public search(terms: string, initialPage: number = 1): Promise<T[]> {
         this._terms = terms;
-        this.select(initialPage);
+        return this.select(initialPage);
     }
 //endregion
 }
