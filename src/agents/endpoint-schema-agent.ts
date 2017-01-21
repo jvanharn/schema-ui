@@ -18,6 +18,7 @@ import { EndpointCursor } from '../cursors/endpoint-cursor';
 import { SchemaNavigator } from '../schema-navigator';
 import { SchemaValidator } from '../schema-validator';
 
+import { compare, apply } from 'fast-json-patch';
 import * as axios from 'axios';
 import * as _ from 'lodash';
 
@@ -28,6 +29,11 @@ var debug = debuglib('schema:endpoint:agent');
  * Regular Expression to lift the parameters set in JSON Schema Hyperlink-hrefs.
  */
 const urlParameterMatchRegexp = /[^{]+(?=\})/g
+
+/**
+ * Mimetype for json-patch.
+ */
+const jsonPatchMimeType = 'application/json-patch';
 
 /**
  * Schema interpreter and "hyper/media-link" agent.
@@ -91,22 +97,23 @@ export class EndpointSchemaAgent implements ISchemaAgent {
      * @return An promise resolving into the decoded response from the server/service/remote.
      */
     public execute<TRequest, TResponse>(link: SchemaHyperlinkDescriptor, data?: TRequest, urlData?: IdentityValues, headers?: HeaderDictionary): Promise<SchemaAgentResponse<TResponse>> {
+        debug(`preparing [${this.schema.root.id}].links.${link.rel}`);
+
         // Resolve the request schema
         return this.resolveLinkRequestSchema(link)
             .then(requestSchema => {
                 // Validate using the request schema (if applicable).
                 if (requestSchema != null) {
                     let validator = SchemaValidator.fromSchema(requestSchema, this.cache, this.fetcher);
-                    debug(`Validating request with link "${link.rel}" from schema "${this.schema.root.id}" with it's request schema.`);
+                    debug(`validate request against [${this.schema.root.id}].links.${link.rel}.requestSchema`);
                     return validator.validate(data);
                 }
             })
             .then(validation => {
                 // Check validation
                 if (validation != null && !validation.valid) {
-                    let message = `Unable to send the message using link "${link.rel}", the request-body was not formatted correctly according to the request-schema included in the link definition.`;
-                    debug(message, validation.errors);
-                    throw new Error(message);
+                    debug(`[error] request validation failed against [${this.schema.root.id}].links.${link.rel}.requestSchema: `, validation.errors);
+                    throw new Error(`Unable to send the message using link "${link.rel}", the request-body was not formatted correctly according to the request-schema included in the link definition.`);
                 }
 
                 // Create the config
@@ -117,11 +124,13 @@ export class EndpointSchemaAgent implements ISchemaAgent {
                     //@todo Design a system that can modify the headers on a per-request, per-schema basis.
                 };
 
+                debug(`configured link ${link.rel} as [${config.method}] ${config.url}`);
+
                 // Return the created request
                 return axios<TRequest, TResponse>(config) as Promise<Axios.AxiosXHR<TResponse>>;
             })
             .then(xhr => {
-                debug(`Request with link "${link.rel}" from schema "${this.schema.root.id}" has been completed.`);
+                debug(`completed [${this.schema.root.id}].links.${link.rel}`);
                 return {
                     headers: xhr.headers,
                     body: xhr.data
@@ -250,12 +259,11 @@ export class EndpointSchemaAgent implements ISchemaAgent {
      * Update an entity item using an array of patch-operations.
      *
      * The linkName for this method is automatically resolved when unset in the following manner:
-     *  - Does the schema have a link by the name of 'patch'?
-     *  - Does the schema have a link by the name of 'update'?
+     *  - Does the schema have a link by the name of 'patch', 'edit' or 'update'?
      *    - Does it have an 'encType' set of type 'application/json-patch'
      *    - Does it have an explicit request schema set?
      *      - Does it validate the JSON Operations?
-     *  - No 'patch' or 'update' link? Reject.
+     *  - Otherwise reject.
      * If none of these are matched an 'read' operation is executed if possible,
      * the patch operation is applied on the fetched item and is executed using the update operation.
      *
@@ -272,7 +280,47 @@ export class EndpointSchemaAgent implements ISchemaAgent {
     public update(identity: IdentityValue, ops: JsonPatchOperation[], linkName?: string, urlData?: IdentityValues): Promise<void>;
     public update<T extends { }>(identity: IdentityValue, item: T, linkName?: string, urlData?: IdentityValues): Promise<void>;
     public update<T extends { }>(identity: IdentityValue, data: T | JsonPatchOperation[], linkName?: string, urlData?: IdentityValues): Promise<void> {
-        
+        // Try to fetch the link name
+        let link = this.chooseAppropriateLink([
+            'patch', // The name this library propagates.
+            'edit', // The official rel name for this kind of method (but not very common).
+            'edit-form',
+            'update'
+        ], linkName);
+        if (!link) {
+            return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
+        }
+
+        // Determine url data
+        if (!_.isPlainObject(urlData)) {
+            urlData = {};
+        }
+        urlData[this.schema.identityProperty] = identity as string;
+
+        // Determine the source and target data types.
+        let sourcePatch = (_.isArray(data) && !_.isEmpty(data) && !!data[0].op),
+            targetPatch = (link.encType === jsonPatchMimeType);
+
+        // Determine body data
+        let bodyData: Promise<any>;
+        if ((sourcePatch && targetPatch) || (!sourcePatch && !targetPatch)) {
+            // Data is already correctly formatted
+            bodyData = Promise.resolve(data);
+        }
+        else if (!sourcePatch && targetPatch) {
+            // We need to generate patch ops for the given data object.
+            // Read the original object and generate the patch ops.
+            bodyData = this.read(urlData).then(original => compare(original, data as T));
+        }
+        else if (sourcePatch && !targetPatch) {
+            // We have patch, and we need to put the whole object.
+            // Read the original and apply the patches on it.
+            bodyData = this.read(urlData).then(original => apply(original, data as any));
+        }
+
+        // Make the request
+        return bodyData.then(sendable =>
+            this.execute(link, sendable, urlData));
     }
 
 
@@ -297,12 +345,6 @@ export class EndpointSchemaAgent implements ISchemaAgent {
         if (!link) {
             return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
         }
-
-        // Determine url data
-        if (!_.isPlainObject(urlData)) {
-            urlData = {};
-        }
-        urlData[this.schema.identityProperty] = identity as string;
 
         // Execute the request
         return this.execute<any, void>(link, void 0, urlData)

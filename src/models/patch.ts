@@ -1,3 +1,5 @@
+export type JsonPatchOperationName = 'add' | 'remove' | 'replace' | 'move' | 'copy' | 'test';
+
 /**
  * JSON Patch Operation Definition
  */
@@ -7,7 +9,7 @@ export interface JsonPatchOperation
      * The operation to perform.
      * OneOf: add, remove, replace, copy, move, test
      */
-    op: string;
+    op: JsonPatchOperationName;
 
     /**
      * Json Path.

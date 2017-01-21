@@ -23,6 +23,7 @@
     "axios": "^0.15.3",
     "debug": "^2.6.0",
     "eventemitter3": "^2.0.2",
+    "fast-json-patch": "^1.1.4",
     "json-pointer": "^0.6.0",
     "lodash": "^4.17.2",
     "z-schema": "^3.18.2"

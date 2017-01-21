@@ -2,6 +2,7 @@
   "dependencies": {
     "debug": "registry:npm/debug#2.0.0+20160723033700",
     "eventemitter3": "registry:dt/eventemitter3#1.2.0+20161121211436",
+    "fast-json-patch": "registry:npm/fast-json-patch#1.1.1+20161024124005",
     "json-pointer": "registry:dt/json-pointer#1.0.0+20160428043022",
     "lodash": "registry:npm/lodash#4.0.0+20161015015725"
   },
