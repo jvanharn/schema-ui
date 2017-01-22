@@ -5,6 +5,11 @@ import { ICursor } from './cursor';
  */
 export interface ISortableCursor<T> extends ICursor<T> {
     /**
+     * Whether or not the last changes to the set sorters have already been applied.
+     */
+    areSortersApplied: boolean;
+
+    /**
      * Sorters set on this cursor/collection that alter the ordering of the contained items.
      */
     readonly sorters: CollectionSortDescriptor[];
@@ -17,7 +22,7 @@ export interface ISortableCursor<T> extends ICursor<T> {
      *
      * @return A promise resolving into all the items on the current page in the sorted collection.
      */
-    sortBy(sort: CollectionSortDescriptor | CollectionSortDescriptor[], replace: boolean): Promise<T[]>;
+    sortBy(sort: CollectionSortDescriptor | CollectionSortDescriptor[], replace: boolean): this;
 
     /**
      * Clear the specified sortable from the sort-list, and reload the current page.
@@ -26,14 +31,14 @@ export interface ISortableCursor<T> extends ICursor<T> {
      *
      * @return A promise resolving into all the items on the current page in the (un)sorted collection.
      */
-    clearSort(sort: CollectionSortDescriptor | CollectionSortDescriptor[]): Promise<T[]>;
+    clearSort(sort: CollectionSortDescriptor | CollectionSortDescriptor[]): this;
 
     /**
      * Clear all currently set sorters, and reload the current page.
      *
      * @return A promise resolving into a list of all items on the current page without any sorters set.
      */
-    clearSorters(): Promise<T[]>;
+    clearSorters(): this;
 }
 
 /**

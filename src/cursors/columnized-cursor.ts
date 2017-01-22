@@ -7,6 +7,11 @@ import { ISortableCursor, SortingDirection } from './sortable-cursor';
  */
 export interface IColumnizedCursor<T> extends ISortableCursor<T>, IFilterableCursor<T> {
     /**
+     * Whether or not the last changes to the set sorters/filters on columns have already been applied.
+     */
+    areColumnsApplied: boolean;
+
+    /**
      * List of columns in the cursor.
      */
     columns: CursorColumnDefinition[];

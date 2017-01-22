@@ -5,6 +5,11 @@ import { ICursor } from './cursor';
  */
 export interface IFilterableCursor<T> extends ICursor<T> {
     /**
+     * Whether or not the last changes to the set filters have already been applied.
+     */
+    areFiltersApplied: boolean;
+
+    /**
      * Filters set on this cursor/collection that limit the items in this cursor.
      */
     readonly filters: CollectionFilterDescriptor[];
@@ -17,7 +22,7 @@ export interface IFilterableCursor<T> extends ICursor<T> {
      *
      * @return A promise resolving into all the items on the current page in the filtered collection.
      */
-    filterBy(filter: CollectionFilterDescriptor | CollectionFilterDescriptor[], replace: boolean): Promise<T[]>;
+    filterBy(filter: CollectionFilterDescriptor | CollectionFilterDescriptor[], replace: boolean): this;
 
     /**
      * Clear the specified filter from the filter-list, and reload the current page.
@@ -26,14 +31,14 @@ export interface IFilterableCursor<T> extends ICursor<T> {
      *
      * @return A promise resolving into all the items on the current page in the filtered collection.
      */
-    clearFilter(filter: CollectionFilterDescriptor | CollectionFilterDescriptor[]): Promise<T[]>;
+    clearFilter(filter: CollectionFilterDescriptor | CollectionFilterDescriptor[]): this;
 
     /**
      * Clear all currently set filters, and reload the current page.
      *
      * @return A promise resolving into a list of all items on the current page without any filters set.
      */
-    clearFilters(): Promise<T[]>;
+    clearFilters(): this;
 }
 
 /**

@@ -252,6 +252,9 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
                     // Emit event after the succesfull fetch
                     this.emit('afterPageChange', { page: this.current, items: this.items });
 
+                    // Set the X-applied properties
+                    this.isSearchApplied = true;
+
                     resolve(info.items);
                 })
                 .catch(err => {
@@ -321,10 +324,16 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
     /**
      * Used to execute a page request with an active search filter.
      */
-    public search(terms: string, initialPage: number = 1): Promise<T[]> {
+    public search(terms: string, initialPage: number = 1): this {
         this._terms = terms;
-        return this.select(initialPage);
+        this.isSearchApplied = false;
+        return this;
     }
+
+    /**
+     * Whether or not the search terms were applied.
+     */
+    public isSearchApplied: boolean = true;
 //endregion
 }
 

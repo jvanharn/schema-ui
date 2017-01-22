@@ -5,6 +5,11 @@ import { ICursor } from './cursor';
  */
 export interface ISearchableCursor<T> extends ICursor<T> {
     /**
+     * Whether or not the last changes to the  have already been applied.
+     */
+    isSearchApplied: boolean;
+
+    /**
      * Search terms.
      */
     readonly terms: string;
@@ -12,5 +17,5 @@ export interface ISearchableCursor<T> extends ICursor<T> {
     /**
      * Used to execute a page request with an active search filter.
      */
-    search(terms: string, initialPage?: number): Promise<T[]>;
+    search(terms: string, initialPage?: number): this;
 }
