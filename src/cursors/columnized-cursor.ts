@@ -24,7 +24,7 @@ export interface IColumnizedCursor<T> extends ISortableCursor<T>, IFilterableCur
      *
      * @return A promise resolving in the sorted first page or rejected when the column is not sortable.
      */
-    sortByColumn(columnName: string, direction: SortingDirection): Promise<T[]>;
+    sortByColumn(columnName: string, direction: SortingDirection): this;
 
     /**
      * Filter the cursor by the given column name and value.
@@ -35,7 +35,7 @@ export interface IColumnizedCursor<T> extends ISortableCursor<T>, IFilterableCur
      *
      * @return A promise resolving in the filtered first page or rejected when the column is not filterable.
      */
-    filterByColumn(columnName: string, operator: CollectionFilterOperator, value: any): void;
+    filterByColumn(columnName: string, operator: CollectionFilterOperator, value: any): this;
 }
 
 /**
