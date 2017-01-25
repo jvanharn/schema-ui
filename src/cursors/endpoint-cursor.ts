@@ -223,7 +223,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
         }
 
         // Create urlData object from absolutely all data we can possibly find.
-        let urlData = this.paginationRequestGenerator(page, this.limit);
+        let urlData = this.paginationRequestGenerator(this, page, this.limit);
         if (!_.isEmpty(this.terms)) {
             urlData[this.searchTermProperty] = this.terms;
         }
@@ -239,7 +239,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
                     this._current = page;
 
                     // Extract the request data
-                    let info = this.paginationInfoExtractor<T>(response);
+                    let info = this.paginationInfoExtractor<T>(this, response);
                     this._items = info.items || [];
                     this._totalPages = info.totalPages;
                     this._count = info.count;
@@ -360,17 +360,17 @@ export interface PaginationInfo<T> {
 /**
  * Function that can extract the needed info for the cursor to load the given response as the current page.
  */
-export type PaginationInfoExtractorFunc = <T>(response: SchemaAgentResponse<any>) => PaginationInfo<T>;
+export type PaginationInfoExtractorFunc = <T>(cursor: EndpointCursor<T>, response: SchemaAgentResponse<any>) => PaginationInfo<T>;
 
 /**
  * Function that can create a dictionary of identity values.
  */
-export type PaginationRequestGeneratorFunc = <T>(page: number, limit: number) => IdentityValues;
+export type PaginationRequestGeneratorFunc = <T>(cursor: EndpointCursor<T>, page: number, limit: number) => IdentityValues;
 
 /**
  * Generic method for fetching pagination information from an agent response.
  */
-export function genericPaginationInfoExtractor<T>(response: SchemaAgentResponse<any>): PaginationInfo<T> {
+export function genericPaginationInfoExtractor<T>(cursor: EndpointCursor<T>, response: SchemaAgentResponse<any>): PaginationInfo<T> {
     // Check the body
     let result: Partial<PaginationInfo<T>> = genericPaginationInfoKeyExtractor<T>({}, response.body);
 
@@ -435,7 +435,7 @@ function checkDataKey<T>(validator: (item: any) => boolean, data: any, key: stri
 /**
  * Generic method for generating urlData for an agent request.
  */
-export function genericPaginationRequestGenerator<T>(page: number, limit: number): IdentityValues {
+export function genericPaginationRequestGenerator<T>(cursor: EndpointCursor<T>, page: number, limit: number): IdentityValues {
     let urlData: IdentityValues = { };
 
     // Set the possible variations of the page keyword.
