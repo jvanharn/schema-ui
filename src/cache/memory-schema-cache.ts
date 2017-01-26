@@ -27,8 +27,8 @@ export class MemorySchemaCache implements ISchemaCache {
      * @param schema The JsonSchema to add to the cache.
      */
     public setSchema(schema: JsonSchema): void {
-        if (schema.id == null) {
-            throw new Error(`MemorySchemaCache.setSchema: Cannot cache the given schema; the schema id is not set.`);
+        if (schema == null || schema.id == null) {
+            throw new Error(`MemorySchemaCache.setSchema: Cannot cache the given schema; the schema or it's id is not set.`);
         }
         this.schemas[schema.id] = schema;
     }

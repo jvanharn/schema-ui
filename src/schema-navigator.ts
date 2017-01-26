@@ -2,6 +2,9 @@ import * as _ from 'lodash';
 import * as pointer from 'json-pointer';
 import schema = require('z-schema');
 
+import * as debuglib from 'debug';
+var debug = debuglib('schema:navigator');
+
 import {
     JsonSchema,
     JsonFormSchema,
@@ -30,6 +33,11 @@ export class SchemaNavigator {
         private propertyPrefix: string = '/',
         private schemaRootPrefix?: string
     ) {
+        if (this.schema == null) {
+            debug('tried to create navigable-schema with empty schema');
+            throw new Error('Cannot make a null schema navigable, the schema property is required.');
+        }
+
         // Fix the property prefix
         this.propertyPrefix = fixJsonPointerPath(propertyPrefix);
 
@@ -40,6 +48,13 @@ export class SchemaNavigator {
         else {
             this.schemaRootPrefix = this.guessSchemaRootPrefix();
         }
+    }
+
+    /**
+     * Get the identifier of the underlying schema.
+     */
+    public get schemaId(): string {
+        return this.schema.id || this.root.id;
     }
 
     /**
@@ -87,7 +102,17 @@ export class SchemaNavigator {
      * Usefull for schemas that are embedded in sub-properties like "item", "items", "{entity}" or ones that also emit meta data at the root level.
      */
     public get root(): JsonSchema | JsonFormSchema | JsonTableSchema {
-        return pointer.get(this.schema, this.schemaRootPrefix);
+        if (this.schemaRootPrefix === '/' || this.schemaRootPrefix.length <= 1) {
+            return this.schema;
+        }
+
+        try {
+            return pointer.get(this.schema, this.schemaRootPrefix);
+        }
+        catch (e) {
+            debug('error when retrieving root', e);
+            return this.schema;
+        }
     }
 
 //region CommonJsonSchema Helpers
@@ -225,10 +250,10 @@ export class SchemaNavigator {
 //region JSON-Pointer helpers
     /**
      * Get property or field value.
-     * 
+     *
      * @param name The name of the property to fetch.
      * @param data The data object to fetch the property from.
-     * 
+     *
      * @return The value of the property or undefined if not set.
      */
     public getPropertyValue(name: string, data: any): any {
@@ -241,9 +266,9 @@ export class SchemaNavigator {
 
     /**
      * Get the identity value for the given data.
-     * 
+     *
      * @param data The data to fetch the identity property value from.
-     * 
+     *
      * @return The identity property value.
      */
     public getIdentityValue(data: any): IdentityValue {
@@ -252,9 +277,9 @@ export class SchemaNavigator {
 
     /**
      * Get all identity property values found in the schema.
-     * 
+     *
      * @param data The data to fetch the identity property values from.
-     * 
+     *
      * @return The identity property value dictionary.
      */
     public getIdentityValues(data: any): IdentityValues {
