@@ -23,6 +23,13 @@ export interface ISchemaCache {
     setSchema(schema: JsonSchema): void;
 
     /**
+     * Remove a schema from the cache.
+     *
+     * @param id Schema id of the schema to delete.
+     */
+    removeSchema(id: string): void;
+
+    /**
      * Get a schema by a predicate.
      *
      * Heavy operation, should be avoided at all cost.

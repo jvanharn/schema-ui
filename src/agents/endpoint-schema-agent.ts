@@ -8,6 +8,8 @@ import {
     IdentityValues
 } from '../models/index';
 import { ISchemaAgent, SchemaAgentResponse, HeaderDictionary } from './schema-agent';
+import { IAuthenticatedSchemaAgent } from './authenticated-schema-agent';
+import { IAgentAuthenticator } from '../authenticators/agent-authenticator';
 import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
 import { ICursor } from '../cursors/cursor';
@@ -18,6 +20,7 @@ import { EndpointCursor } from '../cursors/endpoint-cursor';
 import { SchemaNavigator } from '../schema-navigator';
 import { SchemaValidator } from '../schema-validator';
 
+import * as urltemplate from 'url-template';
 import { compare, apply } from 'fast-json-patch';
 import * as axios from 'axios';
 import * as _ from 'lodash';
@@ -41,16 +44,11 @@ const jsonPatchMimeType = 'application/json-patch';
  * This class makes it possible to read a json-schema and load the links that are defined in it.
  * Makes it easy to use the links used in json-schemas as outlined in the JSON-Schema Hyper schema extension.
  */
-export class EndpointSchemaAgent implements ISchemaAgent {
+export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
     /**
      * The default base url of new instances of the EndpointSchemaAgent.
      */
     public static DefaultBaseUrl: string = '/';
-
-    /**
-     * Parent schema for this agent.
-     */
-    public readonly parent: ISchemaAgent;
 
     /**
      * The base url or prefix before href's mentioned in this agent's SchemaHyperlinks.
@@ -61,6 +59,16 @@ export class EndpointSchemaAgent implements ISchemaAgent {
      * JSON-Pointer path prefix for properties in this schema.
      */
     public path: string = '/';
+
+    /**
+     * Custom headers to send with every request.
+     */
+    public headers: HeaderDictionary = { };
+
+    /**
+     * Authenticator to authenticate requests with.
+     */
+    public authenticator: IAgentAuthenticator;
 
     /**
      * Validate request-data before sending it to the server.
@@ -74,12 +82,14 @@ export class EndpointSchemaAgent implements ISchemaAgent {
      * @param cache The schema cache to use to fetch schema's not currently known to the agent.
      * @param fetcher The fetcher to enable us to fetch schema's that are currently not available.
      * @param validator The validator to help us validate incomming and outgoing requests before they are performed.
+     * @param parent Parent schema for this agent.
      */
     public constructor(
         public readonly schema: SchemaNavigator,
-        private readonly cache: ISchemaCache,
-        private readonly fetcher: ISchemaFetcher,
-        private readonly validator?: SchemaValidator
+        protected readonly cache: ISchemaCache,
+        protected readonly fetcher: ISchemaFetcher,
+        protected readonly validator?: SchemaValidator,
+        public readonly parent?: ISchemaAgent
     ) {
         if (validator == null) {
             this.validator = new SchemaValidator(schema, cache, fetcher);
@@ -104,6 +114,11 @@ export class EndpointSchemaAgent implements ISchemaAgent {
             .then(requestSchema => {
                 // Validate using the request schema (if applicable).
                 if (requestSchema != null) {
+                    if (!!this.validator && requestSchema.$ref && requestSchema.$ref === this.validator.schema.schemaId) {
+                        // Validate using the agent validator
+                        debug(`validate request against [${this.schema.root.id}] own schema`);
+                        return this.validator.validate(data);
+                    }
                     let validator = SchemaValidator.fromSchema(requestSchema, this.cache, this.fetcher);
                     debug(`validate request against [${this.schema.root.id}].links.${link.rel}.requestSchema`);
                     return validator.validate(data);
@@ -116,12 +131,18 @@ export class EndpointSchemaAgent implements ISchemaAgent {
                     throw new Error(`Unable to send the message using link "${link.rel}", the request-body was not formatted correctly according to the request-schema included in the link definition.`);
                 }
 
+                // Get the headers
+                let requestHeaders = _.assign<HeaderDictionary, HeaderDictionary>({}, this.headers, headers);
+                if (!!this.authenticator) {
+                    requestHeaders = this.authenticator.authenticateRequest(requestHeaders);
+                }
+
                 // Create the config
                 let config: Axios.AxiosXHRConfig<TRequest> = {
                     // Resolve the url and set the url data.
                     url: this.rebaseSchemaHyperlinkHref(this.fillSchemaHyperlinkParameters(link.href, urlData || data)),
                     method: link.method || 'GET',
-                    //@todo Design a system that can modify the headers on a per-request, per-schema basis.
+                    headers: requestHeaders
                 };
 
                 debug(`configured link ${link.rel} as [${config.method}] ${config.url}`);
@@ -355,9 +376,21 @@ export class EndpointSchemaAgent implements ISchemaAgent {
     }
 
     /**
+     * Fill the hyperlink parameters of an Hyperschema href.
+     *
+     * @param href The link to fill the parameters of.
+     * @param data The data object to get the variables out of.
+     *
+     * @return An url with the parameters filled.
+     */
+    protected fillSchemaHyperlinkParameters(href: string, data: any): string {
+        return urltemplate.parse(href).expand(data);
+    }
+
+    /**
      * Resolves the schema to be used to verify the correctness of a request's contents.
      */
-    private resolveLinkRequestSchema(link: SchemaHyperlinkDescriptor): Promise<JsonSchema> {
+    protected resolveLinkRequestSchema(link: SchemaHyperlinkDescriptor): Promise<JsonSchema> {
         // Check if the schema is set on the link itself.
         if (!!link.schema && link.schema.$ref == null && !!link.schema.type) {
             return Promise.resolve(link.schema);
@@ -365,7 +398,7 @@ export class EndpointSchemaAgent implements ISchemaAgent {
 
         // Check if the schema exists in our cache.
         var schema: JsonSchema;
-        if (!!link.schema && link.schema['$ref'] != null !!(schema = this.cache.getSchema(link.schema['$ref']))) {
+        if (!!link.schema && link.schema['$ref'] != null && !!(schema = this.cache.getSchema(link.schema['$ref']))) {
             return Promise.resolve(schema);
         }
 
@@ -382,34 +415,9 @@ export class EndpointSchemaAgent implements ISchemaAgent {
     }
 
     /**
-     * Takes a href (e.g. /api/user/{UserId}) and fills in all the parameters, using the data object.
-     *
-     * @param href The Href from the schema to resolve, for the given data object.
-     * @param data The data object to fetch the values for the parameters from.
-     *
-     * @return The processed url that can be loaded.
-     */
-    private fillSchemaHyperlinkParameters(href: string, data: any): string {
-        // Fetch params
-        var params = href.match(urlParameterMatchRegexp);
-        if(!params || params.length === 0) {
-            return href;
-        }
-
-        // Replace params
-        var result = href + '';
-        for(var i = 0; i < params.length; i++) {
-            result = result.replace('{' + params[i] + '}', data[params[i]]);
-            data[params[i]] = void 0;
-        }
-
-        return result;
-    }
-
-    /**
      * Rebases the schema hyperlink base to the one defined in the settings, so it's compatible with the request function in the base service.
      */
-    private rebaseSchemaHyperlinkHref(href: string): string {
+    protected rebaseSchemaHyperlinkHref(href: string): string {
         let url = String(href);
         if (url[0] === '/') {
             url = url.substr(1);
@@ -423,7 +431,7 @@ export class EndpointSchemaAgent implements ISchemaAgent {
     /**
      * Helper method to find the correct schema hyperlink for the job.
      */
-    private chooseAppropriateLink(defaults: string[], userRel?: string): SchemaHyperlinkDescriptor | null {
+    protected chooseAppropriateLink(defaults: string[], userRel?: string): SchemaHyperlinkDescriptor | null {
         if (_.isString(userRel)) {
             return this.schema.getLink(userRel);
         }

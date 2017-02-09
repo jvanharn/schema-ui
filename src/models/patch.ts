@@ -31,5 +31,5 @@ export interface JsonPatchOperation
     /**
      * New value, used for add, replace and test.
      */
-    value?: string;
+    value?: any;
 }

@@ -27,7 +27,7 @@ export interface JsonSchema {
     /**
      * Related schemas linked to inside the same schema.
      */
-    definitions?: { [name: string]: JsonSchema };
+    definitions?: SchemaDefinitionMap;
 
 //region Validation Extension
     /**
@@ -48,12 +48,12 @@ export interface JsonSchema {
     /**
      * Properties inside the schema if the type is "object".
      */
-    properties?: { [property: string]: JsonSchema; };
+    properties?: SchemaPropertyMap;
 
     /**
      * List of properties that are mapped based upon a regex.
      */
-    patternProperties?: { [propertyPattern: string]: JsonSchema; };
+    patternProperties?: SchemaPatternPropertyMap;
 
     /**
      * The description of valid items for a field of type "array".
@@ -271,3 +271,18 @@ export interface SchemaHyperlinkDescriptor {
      */
     targetSchema?: JsonSchema
 }
+
+/**
+ * Map/dictionary containing schema names and a sub-schema.
+ */
+export type SchemaDefinitionMap = { [name: string]: JsonSchema; };
+
+/**
+ * Map/dictionary containing property names and a sub-schema.
+ */
+export type SchemaPropertyMap = { [property: string]: JsonSchema; };
+
+/**
+ * Map/dictionary of properties that use regex as the index.
+ */
+export type SchemaPatternPropertyMap = { [propertyPattern: string]: JsonSchema; };

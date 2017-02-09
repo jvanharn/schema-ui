@@ -1,4 +1,11 @@
-export { JsonSchema, SchemaHyperlinkDescriptor } from './schema';
+export {
+    JsonSchema,
+    SchemaHyperlinkDescriptor,
+    SchemaMediaDescriptor,
+    SchemaDefinitionMap,
+    SchemaPropertyMap,
+    SchemaPatternPropertyMap
+} from './schema';
 export { CommonJsonSchema } from './common';
 export { JsonPatchOperation } from './patch';
 export { JsonFormSchema, IdentityValues, IdentityValue } from './form';

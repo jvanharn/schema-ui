@@ -34,6 +34,13 @@ export class MemorySchemaCache implements ISchemaCache {
     }
 
     /**
+     * @inherit
+     */
+    public removeSchema(id: string): void {
+        delete this.schemas[id];
+    }
+
+    /**
      * Get a schema by a predicate.
      *
      * @param predicate The predicate that will decide whether the given schema, is the schema you need.

@@ -53,6 +53,13 @@ export class SchemaIndex implements ISchemaCache {
     /**
      * @inherit
      */
+    public removeSchema(id: string): void {
+        this.removeSchema(id);
+    }
+
+    /**
+     * @inherit
+     */
     public getSchemaBy(predicate: (schema: JsonSchema) => boolean): JsonSchema {
         return this.cache.getSchemaBy(predicate);
     }

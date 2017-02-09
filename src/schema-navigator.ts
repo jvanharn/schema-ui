@@ -23,6 +23,11 @@ import {
  */
 export class SchemaNavigator {
     /**
+     * Cache where a list of resolved schemaids to properties is saved into.
+     */
+    protected schemaIdPointerMap: { [schemaId: string]: string };
+
+    /**
      * Construct a new schema navigator.
      * @param schema The schema to wrap as navigable.
      * @param propertyPrefix The json-pointer prefix of this jsonschema when fetching property values from objects/values/... that are validated by this schema.
@@ -64,21 +69,24 @@ export class SchemaNavigator {
      */
     public get identityProperty(): string {
         let fields = this.propertyRoot,
-            name: string;
-        for (let key in fields) {
-            let score = this.isIdentityProperty(key);
+            name: string,
+            current: number;
+
+        for (var key in fields) {
+            var score = this.isIdentityProperty(key);
             if (!name) {
                 name = key;
+                current = Math.min(score, 3);
             }
-            if (fields.hasOwnProperty(key)) {
+            else if (fields.hasOwnProperty(key) && score > current) {
                 if (score === 1) {
                     return key;
                 }
-                else if (score === 2) {
-                    name = key;
-                }
+                name = key;
+                current = score;
             }
         }
+
         return name;
     }
 
@@ -304,11 +312,34 @@ export class SchemaNavigator {
      * This method makes it easier to resolve embedded schemas by ids.
      */
     public getSchemaIdsWithPointers(): { [id: string]: string } {
+        if (this.schemaIdPointerMap != null) {
+            return this.schemaIdPointerMap;
+        }
+
         let result: { [id: string]: string } = { };
         this.traverseSchemaDefinitions(this.schema, (id: string, pointer: string) => {
             result[id] = pointer;
         });
+
+        this.schemaIdPointerMap = result;
         return result;
+    }
+
+    /**
+     * Get an embedded schema by the given id.
+     *
+     * @param schemaId The identity of the schema to retrieve.
+     *
+     * @return The embedded shcema or null if it was not found.
+     */
+    public getEmbeddedSchema(schemaId: string): JsonSchema | null {
+        let sp = this.getSchemaIdsWithPointers()[schemaId];
+        if (sp == null || sp === '') {
+            debug(`requested embedded schema with id ${schemaId}, but could not find it`);
+            return null;
+        }
+
+        return pointer.get(this.schema, sp);
     }
 
     /**

@@ -27,6 +27,11 @@ export interface ISchemaAgent {
     readonly schema: SchemaNavigator;
 
     /**
+     * Default request headers to be sent with every request.
+     */
+    readonly headers: HeaderDictionary;
+
+    /**
      * Create a new item for the currently set schema.
      *
      * @param item Values for the item to create.
