@@ -29,11 +29,6 @@ import * as debuglib from 'debug';
 var debug = debuglib('schema:endpoint:agent');
 
 /**
- * Regular Expression to lift the parameters set in JSON Schema Hyperlink-hrefs.
- */
-const urlParameterMatchRegexp = /[^{]+(?=\})/g
-
-/**
  * Mimetype for json-patch.
  */
 const jsonPatchMimeType = 'application/json-patch';

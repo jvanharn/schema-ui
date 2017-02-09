@@ -12,8 +12,9 @@ export { SchemaIndex } from './cache/schema-index';
 export { MemorySchemaCache } from './cache/memory-schema-cache';
 export { LocalStorageSchemaCache } from './cache/local-storage-schema-cache';
 
-export { ISchemaFetcher } from './fetchers/schema-fetcher';
-export { NullSchemaFetcher } from './fetchers/null-schema-fetcher';
+export * from './fetchers/schema-fetcher';
+export * from './fetchers/authenticated-schema-fetcher';
+export * from './fetchers/null-schema-fetcher';
 
 export { SchemaNavigator } from './schema-navigator';
 export * from './schema-validator';
@@ -23,4 +24,5 @@ export * from './authenticators/basic-agent-authenticator';
 export * from './authenticators/jwt-agent-authenticator';
 
 export * from './agents/schema-agent';
+export * from './agents/authenticated-schema-agent';
 export * from './agents/endpoint-schema-agent';
