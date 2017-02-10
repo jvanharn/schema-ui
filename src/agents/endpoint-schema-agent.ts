@@ -1,3 +1,4 @@
+import {  } from 'sh-lib-client';
 import {
     JsonSchema,
 
@@ -5,7 +6,8 @@ import {
     SchemaHyperlinkDescriptor,
 
     IdentityValue,
-    IdentityValues
+    IdentityValues,
+    EntityIdentity
 } from '../models/index';
 import { ISchemaAgent, SchemaAgentResponse, HeaderDictionary } from './schema-agent';
 import { IAuthenticatedSchemaAgent } from './authenticated-schema-agent';
@@ -49,11 +51,6 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
      * The base url or prefix before href's mentioned in this agent's SchemaHyperlinks.
      */
     public baseUrl: string = String(EndpointSchemaAgent.DefaultBaseUrl);
-
-    /**
-     * JSON-Pointer path prefix for properties in this schema.
-     */
-    public path: string = '/';
 
     /**
      * Custom headers to send with every request.
@@ -181,15 +178,12 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
     /**
      * Read an item of the currently set schema.
      *
-     * @param identity The identity of the entity item to read/fetch.
-     * @param urldata The identity-values of the entity item to read/fetch, will be used to find variable-ref values in the url.
+     * @param identity The identity-value(s) of the entity item to read/fetch, will be used to find variable-ref values in the url.
      * @param linkName The name of the link to use to read the item with.
      *
      * @return An promise that resolves into the requested entity, and adheres to the set link schema, if it is set.
      */
-    public read<T>(identity: IdentityValue, linkName?: string): Promise<T>;
-    public read<T>(urlData: IdentityValues, linkName?: string): Promise<T>;
-    public read<T>(data: IdentityValue | IdentityValues, linkName?: string): Promise<T> {
+    public read<T>(identity: EntityIdentity, linkName?: string): Promise<T> {
         // Try to fetch the link name
         let link = this.chooseAppropriateLink([
             'read', // The name this library propagates.
@@ -205,12 +199,12 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
 
         // Determine url data
         let urlData: IdentityValues;
-        if (!_.isPlainObject(data)) {
+        if (!_.isPlainObject(identity)) {
             urlData = {};
-            urlData[this.schema.identityProperty] = data as string;
+            urlData[this.schema.identityProperty] = identity as string;
         }
         else {
-            urlData = data as IdentityValues;
+            urlData = identity as IdentityValues;
         }
 
         // Execute the request
@@ -293,9 +287,9 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
      *
      * @return A promise that resolves when the update was succesfull.
      */
-    public update(identity: IdentityValue, ops: JsonPatchOperation[], linkName?: string, urlData?: IdentityValues): Promise<void>;
-    public update<T extends { }>(identity: IdentityValue, item: T, linkName?: string, urlData?: IdentityValues): Promise<void>;
-    public update<T extends { }>(identity: IdentityValue, data: T | JsonPatchOperation[], linkName?: string, urlData?: IdentityValues): Promise<void> {
+    public update(identity: EntityIdentity, ops: JsonPatchOperation[], linkName?: string): Promise<void>;
+    public update<T extends { }>(identity: EntityIdentity, item: T, linkName?: string): Promise<void>;
+    public update<T extends { }>(identity: EntityIdentity, data: T | JsonPatchOperation[], linkName?: string): Promise<void> {
         // Try to fetch the link name
         let link = this.chooseAppropriateLink([
             'patch', // The name this library propagates.
@@ -308,10 +302,14 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
         }
 
         // Determine url data
-        if (!_.isPlainObject(urlData)) {
+        let urlData: IdentityValues;
+        if (!_.isPlainObject(identity)) {
             urlData = {};
+            urlData[this.schema.identityProperty] = identity as string;
         }
-        urlData[this.schema.identityProperty] = identity as string;
+        else {
+            urlData = identity as IdentityValues;
+        }
 
         // Determine the source and target data types.
         let sourcePatch = (_.isArray(data) && !_.isEmpty(data) && !!data[0].op),
@@ -348,7 +346,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
      *
      * @return A promise that resolves once the item is succesfully deleted.
      */
-    public delete(identity: IdentityValue, linkName?: string, urlData?: IdentityValues): Promise<void> {
+    public delete(identity: EntityIdentity, linkName?: string): Promise<void> {
         // Try to fetch the link name
         let link = this.chooseAppropriateLink([
             'read', // The name this library propagates.
@@ -360,6 +358,16 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
         ], linkName);
         if (!link) {
             return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
+        }
+
+        // Determine url data
+        let urlData: IdentityValues;
+        if (!_.isPlainObject(identity)) {
+            urlData = {};
+            urlData[this.schema.identityProperty] = identity as string;
+        }
+        else {
+            urlData = identity as IdentityValues;
         }
 
         // Execute the request

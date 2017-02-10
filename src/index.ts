@@ -5,6 +5,7 @@ export * from './cursors/searchable-cursor';
 export * from './cursors/sortable-cursor';
 export * from './cursors/filterable-cursor';
 export * from './cursors/columnized-cursor';
+export * from './cursors/value-cursor';
 export * from './cursors/endpoint-cursor';
 
 export { ISchemaCache } from './cache/schema-cache';

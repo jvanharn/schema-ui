@@ -1,4 +1,4 @@
-import { ICursor, CursorLoadingState, PageChangeEvent } from './cursor';
+import { ICursor, CursorLoadingState, PageChangeEvent, getAllCursorPages } from './cursor';
 import { ISearchableCursor } from './searchable-cursor';
 
 import { SchemaHyperlinkDescriptor, IdentityValues } from '../models/index';
@@ -276,39 +276,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
      * @return A promise resolving in all the items in this collection (Beware, this can pottentially be millions of items).
      */
     public all(limit?: number): Promise<T[]> {
-        return new Promise((resolve, reject) => {
-            var firstPage: Promise<T[]>;
-            debug(`fetching all pages of cursor for [${this.agent.schema.root.id}]->{${this.linkName}}`);
-            if (this.loadingState > CursorLoadingState.Uninitialized) {
-                if (this.loadingState === CursorLoadingState.Ready) {
-                    debug(`cursor{${this.linkName}} firstpage already loaded`);
-                    firstPage = Promise.resolve(this.items);
-                }
-                else {
-                    debug(`cursor{${this.linkName}} firstpage loaded on afterPageChange event`);
-                    firstPage = new Promise(resolve => this.once('afterPageChange', (x: PageChangeEvent<T>) => resolve(x.items)));
-                }
-            }
-            else {
-                debug(`cursor{${this.linkName}} firstpage loaded by select(1)`);
-                firstPage = this.select(1);
-            }
-
-            firstPage
-                .then(items => {
-                    var promises: Promise<T[]>[] = [Promise.resolve(this.items)];
-                    for (var i = 2; i <= this.totalPages; i++) {
-                        promises.push(this.select(i));
-                    }
-                    Promise
-                        .all(promises)
-                        .then(result => {
-                            resolve(_.flatten(result));
-                        })
-                        .catch(reject);
-                })
-                .catch(reject);
-        });
+        return getAllCursorPages(this);
     }
 
 //region ISearchableCursor implementation

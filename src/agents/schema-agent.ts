@@ -7,7 +7,8 @@ import {
     SchemaHyperlinkDescriptor,
 
     IdentityValue,
-    IdentityValues
+    IdentityValues,
+    EntityIdentity
 } from '../models/index';
 import { SchemaNavigator } from '../schema-navigator';
 import { ICursor } from '../cursors/cursor';
@@ -48,17 +49,17 @@ export interface ISchemaAgent {
      *
      * @return An promise that resolves into the requested entity, and adheres to the set link schema, if it is set.
      */
-    read<T>(identity: IdentityValue, linkName?: string): Promise<T>;
+    read<T>(identity: EntityIdentity, linkName?: string): Promise<T>;
 
     /**
      * Read an item of the currently set schema.
      *
-     * @param urldata The identity-values of the entity item to read/fetch, will be used to find variable-ref values in the url.
+     * @param identity The identity-value(s) of the entity item to read/fetch, will be used to find variable-ref values in the url.
      * @param linkName The name of the link to use to read the item with.
      *
      * @return An promise that resolves into the requested entity, and adheres to the set link schema, if it is set.
      */
-    read<T>(urlData: IdentityValues, linkName?: string): Promise<T>;
+    read<T>(identity: EntityIdentity, linkName?: string): Promise<T>;
 
     /**
      * Get a cursor for this collection (if the schema supports this) and filter it's contents.
@@ -103,12 +104,11 @@ export interface ISchemaAgent {
      * @param ops Update/patch operation to execute on the given item.
      * @param item The complete item that should be the new value for the item with the given identity.
      * @param linkName The name of the link to load.
-     * @param urlData (Optionally) Data object to resolve parameters from the url in. If not set, uses the data object, if that's not set it rejects.
      *
      * @return A promise that resolves when the update was succesfull.
      */
-    update(identity: IdentityValue, ops: JsonPatchOperation[], linkName?: string, urlData?: IdentityValues): Promise<void>;
-    update<T extends { }>(identity: IdentityValue, item: T, linkName?: string, urlData?: IdentityValues): Promise<void>;
+    update(identity: EntityIdentity, ops: JsonPatchOperation[], linkName?: string): Promise<void>;
+    update<T extends { }>(identity: EntityIdentity, item: T, linkName?: string): Promise<void>;
 
     /**
      * Remove an entity item.
@@ -118,7 +118,7 @@ export interface ISchemaAgent {
      *
      * @return A promise that resolves once the item is succesfully deleted.
      */
-    delete(identity: IdentityValue, linkName?: string, urlData?: IdentityValues): Promise<void>;
+    delete(identity: EntityIdentity, linkName?: string): Promise<void>;
 
     /**
      * Execute the given link definition in the context of the current schema.

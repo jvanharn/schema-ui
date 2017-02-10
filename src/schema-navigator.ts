@@ -10,6 +10,7 @@ import {
     JsonFormSchema,
     JsonTableSchema,
     CommonJsonSchema,
+    SchemaPropertyMap,
 
     IdentityValue,
     IdentityValues,
@@ -34,9 +35,9 @@ export class SchemaNavigator {
      * @param schemaRootPrefix The json-pointer prefix of what value path should be considered the 'root' "properties" object containing the properties for listing fields (for JsonFormSchemas).
      */
     public constructor(
-        private readonly schema: JsonSchema | JsonFormSchema | JsonTableSchema,
-        private propertyPrefix: string = '/',
-        private schemaRootPrefix?: string
+        protected readonly schema: JsonSchema | JsonFormSchema | JsonTableSchema,
+        public readonly propertyPrefix: string = '/',
+        public readonly schemaRootPrefix?: string
     ) {
         if (this.schema == null) {
             debug('tried to create navigable-schema with empty schema');
@@ -141,7 +142,7 @@ export class SchemaNavigator {
      *
      * @return Dictionary of property names and their JsonSchemas.
      */
-    public get propertyRoot(): { [property: string]: JsonSchema } {
+    public get propertyRoot(): SchemaPropertyMap<JsonSchema> {
         if (this.hasPatternProperties()) {
             // Cannot handle patternProperties.
             //@todo debug this to a console of sorts.
@@ -172,7 +173,7 @@ export class SchemaNavigator {
      *
      * @return An dictionary of all visible fields in thi JsonFormSchema.
      */
-    public get fields(): { [property: string]: JsonSchema } {
+    public get fields(): SchemaPropertyMap<JsonFormSchema> {
         let props = this.propertyRoot,
             fields: { [property: string]: JsonSchema } = {};
         for (let key in props) {
@@ -185,7 +186,29 @@ export class SchemaNavigator {
                 fields[key] = props[key];
             }
         }
-        return fields;
+        return fields as any;
+    }
+
+    /**
+     * Check whether the field in this schema root is required.
+     *
+     * @param name The name of the field to check. Has to be returned by the fields property.
+     *
+     * @return Whether or not the given field is required.
+     */
+    public isFieldRequired(name: string): boolean {
+        if (this.hasPatternProperties()) {
+            // Cannot handle patternProperties.
+            //@todo debug this to a console of sorts.
+            return null;
+        }
+        else if (this.schema.type === 'object') {
+            return _.includes(this.root.required, name);
+        }
+        else if (this.schema.type) {
+            return _.includes((this.root.items as JsonSchema).required, name);
+        }
+        return false;
     }
 //endregion
 
@@ -231,6 +254,20 @@ export class SchemaNavigator {
     public getLink(rel: string): SchemaHyperlinkDescriptor {
         return _.find(this.links, x => x.rel === rel);
     }
+
+    /**
+     * Check whether a schema hyper(media)link by the given relation type exists.
+     *
+     * @link https://tools.ietf.org/html/rfc5988#section-6.2.2 See this page for official 'rel' value names.
+     *
+     * @param rel Name or 'relation' of the hyperlink.
+     *
+     * @return Whether or not the given link exists on this schema.
+     */
+    public hasLink(rel: string): boolean {
+        return _.some(this.links, x => x.rel === rel);
+    }
+
 
     /**
      * Get a schema hyper(media)link by a ordered list of relation types.

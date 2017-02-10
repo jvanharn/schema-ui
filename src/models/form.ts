@@ -19,18 +19,18 @@ export type IdentityValue = string | number;
 /**
  * Type alias for a collection of identity-like values.
  */
-export type IdentityValues = { [ key: string ]: IdentityValue };
+export type IdentityValues = { [ propertyName: string ]: IdentityValue };
+
+/**
+ * Type alias for identity-like values or collections of them.
+ */
+export type EntityIdentity = IdentityValues | IdentityValue;
 
 /**
  * Describes how a Form Field should be rendered by the UserAgent.
  */
 export interface SchemaFieldDescriptor
 {
-    /**
-     * Name of the property being represented.
-     */
-    name?: string;
-
     /**
      * Name of the field type, it should be rendered as (if it should be different than the default logic resolving)
      */

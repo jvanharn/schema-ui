@@ -8,5 +8,11 @@ export {
 } from './schema';
 export { CommonJsonSchema } from './common';
 export { JsonPatchOperation } from './patch';
-export { JsonFormSchema, IdentityValues, IdentityValue } from './form';
+export {
+    JsonFormSchema,
+    SchemaFieldDescriptor,
+    IdentityValues,
+    IdentityValue,
+    EntityIdentity
+} from './form';
 export { JsonTableSchema, SchemaColumnDescriptor } from './table';

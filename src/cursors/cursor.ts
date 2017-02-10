@@ -1,6 +1,10 @@
 import { JsonSchema } from '../models/schema';
 import { EventEmitter } from 'eventemitter3';
 
+import * as _ from 'lodash';
+import * as debuglib from 'debug';
+var debug = debuglib('schema:cursor');
+
 /**
  * Interface for iterating over a paginated datasource.
  *
@@ -147,4 +151,40 @@ export interface PageChangeEvent<T> {
      * The items that were fetched, or null when this is the before event.
      */
     items?: T[];
+}
+
+export function getAllCursorPages<T>(cursor: ICursor<T>): Promise<T[]> {
+    return new Promise((resolve, reject) => {
+        var firstPage: Promise<T[]>;
+        debug(`getAllCursorPages: fetching all pages of cursor for [${(cursor.constructor as any).name}]->{}`);
+        if (this.loadingState > CursorLoadingState.Uninitialized) {
+            if (this.loadingState === CursorLoadingState.Ready) {
+                debug(`getAllCursorPages: firstpage already loaded`);
+                firstPage = Promise.resolve(this.items);
+            }
+            else {
+                debug(`getAllCursorPages: firstpage loaded on afterPageChange event`);
+                firstPage = new Promise(resolve => this.once('afterPageChange', (x: PageChangeEvent<T>) => resolve(x.items)));
+            }
+        }
+        else {
+            debug(`getAllCursorPages: firstpage loaded by select(1)`);
+            firstPage = this.select(1);
+        }
+
+        firstPage
+            .then(items => {
+                var promises: Promise<T[]>[] = [Promise.resolve(this.items)];
+                for (var i = 2; i <= this.totalPages; i++) {
+                    promises.push(this.select(i));
+                }
+                Promise
+                    .all(promises)
+                    .then(result => {
+                        resolve(_.flatten(result));
+                    })
+                    .catch(reject);
+            })
+            .catch(reject);
+    });
 }

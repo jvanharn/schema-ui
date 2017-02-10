@@ -37,7 +37,7 @@ export class LocalStorageSchemaCache implements ISchemaCache {
     /**
      * Index of all schemas.
      */
-    private schemas: SchemaCacheEntry[];
+    private schemas: SchemaCacheEntry[] = [];
 
     /**
      * Checks whether or not localstorage is available on the current platform.
@@ -46,6 +46,7 @@ export class LocalStorageSchemaCache implements ISchemaCache {
         if (!platformStorage) {
             throw new Error('Cannot create a localStorage-based schema cache, because the localstorage is unavailable.');
         }
+        this.loadSchemaList();
     }
 
     /**
@@ -198,10 +199,7 @@ export class LocalStorageSchemaCache implements ISchemaCache {
          */
         private loadSchemaList(): void {
             var result = platformStorage.getItem(this.prefixStorageProperty(schemaCacheBucketRootList));
-            if (!result) {
-                this.schemas = [];
-            }
-            else {
+            if (!!result) {
                 this.schemas = JSON.parse(result);
             }
         }
