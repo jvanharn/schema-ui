@@ -27,6 +27,11 @@ export type IdentityValues = { [ key: string ]: IdentityValue };
 export interface SchemaFieldDescriptor
 {
     /**
+     * Name of the property being represented.
+     */
+    name?: string;
+
+    /**
      * Name of the field type, it should be rendered as (if it should be different than the default logic resolving)
      */
     type?: string;

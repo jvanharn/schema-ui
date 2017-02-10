@@ -83,7 +83,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
         public readonly schema: SchemaNavigator,
         protected readonly cache: ISchemaCache,
         protected readonly fetcher: ISchemaFetcher,
-        protected readonly validator?: SchemaValidator,
+        public readonly validator?: SchemaValidator,
         public readonly parent?: ISchemaAgent
     ) {
         if (validator == null) {

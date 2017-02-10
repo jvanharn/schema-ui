@@ -8,5 +8,5 @@ export interface IAuthenticatedSchemaFetcher extends ISchemaFetcher {
     /**
      * Authenticator to be able to authenticate requests with.
      */
-    authenticator: IAgentAuthenticator;
+    authenticator?: IAgentAuthenticator;
 }
