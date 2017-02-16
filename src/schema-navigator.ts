@@ -79,7 +79,7 @@ export class SchemaNavigator {
                 name = key;
                 current = Math.min(score, 3);
             }
-            else if (fields.hasOwnProperty(key) && score > current) {
+            else if (fields.hasOwnProperty(key) && score > 0 && score < current) {
                 if (score === 1) {
                     return key;
                 }
