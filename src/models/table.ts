@@ -2,7 +2,7 @@ import { CommonJsonSchema } from './common';
 
 /**
  * JsonSchema with table extensions.
- * 
+ *
  * This extension to JsonSchema adds a property that describes how to display this entity, when looking at it in a collection endpoint.
  */
 export interface JsonTableSchema extends CommonJsonSchema {
@@ -28,8 +28,9 @@ export interface SchemaColumnDescriptor {
 
     /**
      * Type of column.
+     * @default 'text'
      */
-    type: string;
+    type: string; // 'text' | 'numeric' | 'money' | 'monospaced' | 'keys' | 'image'
 
     /**
      * Whether or not the column is filterable.
@@ -39,6 +40,7 @@ export interface SchemaColumnDescriptor {
 
     /**
      * Whether or not sortable is sortable.
+     * @default false
      */
     sortable?: boolean;
 }

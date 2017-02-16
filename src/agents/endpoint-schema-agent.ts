@@ -106,7 +106,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
             .then(requestSchema => {
                 // Validate using the request schema (if applicable).
                 if (requestSchema != null) {
-                    if (!!this.validator && requestSchema.$ref && requestSchema.$ref === this.validator.schema.schemaId) {
+                    if (!!this.validator && requestSchema.id && requestSchema.id === this.validator.schema.schemaId) {
                         // Validate using the agent validator
                         debug(`validate request against [${this.schema.root.id}] own schema`);
                         return this.validator.validate(data);
@@ -134,8 +134,16 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
                     // Resolve the url and set the url data.
                     url: this.rebaseSchemaHyperlinkHref(this.fillSchemaHyperlinkParameters(link.href, urlData || data)),
                     method: link.method || 'GET',
-                    headers: requestHeaders
+                    headers: requestHeaders,
                 };
+
+                // Set the data
+                if (config.method.toUpperCase() === 'GET') {
+                    config.params = data;
+                }
+                else {
+                    config.data = data;
+                }
 
                 debug(`configured link ${link.rel} as [${config.method}] ${config.url}`);
 
@@ -379,6 +387,23 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
     }
 
     /**
+     * Get the last parent in this chain.
+     */
+    public getRoot(): EndpointSchemaAgent {
+        var depth = 0,
+            last = this;
+        while (last.parent != null) {
+            if (depth++ > 30) {
+                debug('getRoot() exceeded the max parent depth of 30.');
+                break;
+            }
+            last = last.parent as any;
+        }
+
+        return last;
+    }
+
+    /**
      * Fill the hyperlink parameters of an Hyperschema href.
      *
      * @param href The link to fill the parameters of.
@@ -403,6 +428,11 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
         var schema: JsonSchema;
         if (!!link.schema && link.schema['$ref'] != null && !!(schema = this.cache.getSchema(link.schema['$ref']))) {
             return Promise.resolve(schema);
+        }
+
+        // Check if the schema is a local reference
+        if (!!link.schema && link.schema['$ref'] != null && link.schema['$ref'][0] === '#') {
+            return Promise.resolve(this.schema.getEmbeddedSchema(link.schema['$ref']));
         }
 
         // Fetch it using our fetcher instance.

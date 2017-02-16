@@ -18,11 +18,11 @@ export interface ISortableCursor<T> extends ICursor<T> {
      * Sorts the cursor's collection by the given sortable(s), applies them and reloads the current page.
      *
      * @param sort The (additional) sort(ers) to sort the collection with.
-     * @param replace Whether or not the given sort(ers) should replace the currently set sorters.
+     * @param replace Whether or not the given sort(ers) should replace the currently set sorters. Defaults to replacing.
      *
      * @return A promise resolving into all the items on the current page in the sorted collection.
      */
-    sortBy(sort: CollectionSortDescriptor | CollectionSortDescriptor[], replace: boolean): this;
+    sortBy(sort: CollectionSortDescriptor | CollectionSortDescriptor[], replace?: boolean): this;
 
     /**
      * Clear the specified sortable from the sort-list, and reload the current page.

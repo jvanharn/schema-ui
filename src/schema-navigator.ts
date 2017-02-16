@@ -36,7 +36,7 @@ export class SchemaNavigator {
      */
     public constructor(
         protected readonly schema: JsonSchema | JsonFormSchema | JsonTableSchema,
-        public readonly propertyPrefix: string = '/',
+        public propertyPrefix: string = '/',
         public readonly schemaRootPrefix?: string
     ) {
         if (this.schema == null) {
@@ -45,11 +45,11 @@ export class SchemaNavigator {
         }
 
         // Fix the property prefix
-        this.propertyPrefix = fixJsonPointerPath(propertyPrefix);
+        this.propertyPrefix = fixJsonPointerPath(propertyPrefix, true);
 
         // Determine the schemaRootPrefix
         if (this.schemaRootPrefix != null && this.schemaRootPrefix.length > 0) {
-            this.schemaRootPrefix = fixJsonPointerPath(propertyPrefix);
+            this.schemaRootPrefix = fixJsonPointerPath(propertyPrefix, true);
         }
         else {
             this.schemaRootPrefix = this.guessSchemaRootPrefix();
@@ -138,20 +138,61 @@ export class SchemaNavigator {
 
 //region JsonFormSchema Helpers
     /**
+     * Property containing the cached pattern property root.
+     */
+    private _patternPropertyRootCache: SchemaPropertyMap<JsonSchema>;
+
+    /**
+     * Property containing the cached pattern property root.
+     */
+    private _patternRequiredPropertyCache: string[];
+
+    /**
+     * Builds the cache of (required) pattern properties
+     */
+    private _buildPatternPropertyCache(): void {
+        // begin with any regular properties, if they are set
+        if (_.isPlainObject(this.root.properties) && _.size(this.root.properties) > 0) {
+            this._patternPropertyRootCache = _.assign({}, this.root.properties) as SchemaPropertyMap<JsonSchema>;
+        }
+        else {
+            this._patternPropertyRootCache = { };
+        }
+        this._patternRequiredPropertyCache = [];
+
+        var parts = this.propertyPrefix.split('/'),
+            matchable = !!parts && !!parts[1] ? String(parts[1]) : '';
+        if (matchable.length === 0) {
+            debug(`[warn] propertyRoot is matching on an empty first property root path (${this.propertyPrefix}), so this will probably cause unexpected behaviour.`);
+        }
+
+        _.each(this.root.patternProperties, (schema: JsonSchema, pattern: string) => {
+            if (matchable.search(pattern) >= 0) {
+                this._patternPropertyRootCache = _.assign(this._patternPropertyRootCache, schema.properties) as SchemaPropertyMap<JsonSchema>;
+                if (_.isArray(schema.required)) {
+                    this._patternRequiredPropertyCache.push(...schema.required);
+                }
+            }
+        });
+    }
+
+    /**
      * Get all schema properties.
      *
      * @return Dictionary of property names and their JsonSchemas.
      */
     public get propertyRoot(): SchemaPropertyMap<JsonSchema> {
         if (this.hasPatternProperties()) {
-            // Cannot handle patternProperties.
-            //@todo debug this to a console of sorts.
-            return { };
+            if (this._patternPropertyRootCache == null) {
+                this._buildPatternPropertyCache();
+            }
+
+            return this._patternPropertyRootCache;
         }
         else if (this.schema.type === 'object') {
             return this.root.properties;
         }
-        else if (this.schema.type) {
+        else if (this.schema.type === 'array') {
             return (this.root.items as JsonSchema).properties;
         }
         else {
@@ -175,18 +216,18 @@ export class SchemaNavigator {
      */
     public get fields(): SchemaPropertyMap<JsonFormSchema> {
         let props = this.propertyRoot,
-            fields: { [property: string]: JsonSchema } = {};
+            fields: SchemaPropertyMap<JsonFormSchema> = { };
         for (let key in props) {
-            if (props.hasOwnProperty(key) &&
-                (!!(props[key] as JsonFormSchema).field && (
-                    (!!(props[key] as JsonFormSchema).field.type && !(props[key] as JsonFormSchema).field.visible === void 0) ||
-                    (!(props[key] as JsonFormSchema).field.visible === true)
-                ))
-            ) {
-                fields[key] = props[key];
+            if (!props.hasOwnProperty(key)) {
+                continue;
+            }
+
+            let item = (props[key] as JsonFormSchema).field;
+            if (!!item && (item.visible === true || (item.type != null && item.visible !== false))) {
+                fields[key] = props[key] as JsonFormSchema;
             }
         }
-        return fields as any;
+        return fields;
     }
 
     /**
@@ -198,9 +239,11 @@ export class SchemaNavigator {
      */
     public isFieldRequired(name: string): boolean {
         if (this.hasPatternProperties()) {
-            // Cannot handle patternProperties.
-            //@todo debug this to a console of sorts.
-            return null;
+            if (this._patternRequiredPropertyCache == null) {
+                this._buildPatternPropertyCache();
+            }
+
+            return _.includes(this._patternRequiredPropertyCache, name);
         }
         else if (this.schema.type === 'object') {
             return _.includes(this.root.required, name);
@@ -247,12 +290,19 @@ export class SchemaNavigator {
      *
      * @link https://tools.ietf.org/html/rfc5988#section-6.2.2 See this page for official 'rel' value names.
      *
-     * @param rel Name or 'relation' of the hyperlink.
+     * @param rel Name or 'relation' of the hyperlink OR index of the hyperlink.
      *
      * @return The hyperlink descriptor object.
      */
-    public getLink(rel: string): SchemaHyperlinkDescriptor {
-        return _.find(this.links, x => x.rel === rel);
+    public getLink(rel: string | number): SchemaHyperlinkDescriptor {
+        if (_.isString(rel)) {
+            return _.find(this.links, x => x.rel === rel);
+        }
+        else if (_.isNumber(rel)) {
+            return this.links[rel];
+        }
+        debug('link requested with invalid "rel" type');
+        return null;
     }
 
     /**
@@ -260,12 +310,19 @@ export class SchemaNavigator {
      *
      * @link https://tools.ietf.org/html/rfc5988#section-6.2.2 See this page for official 'rel' value names.
      *
-     * @param rel Name or 'relation' of the hyperlink.
+     * @param rel Name or 'relation' of the hyperlink or index of the hyperlink.
      *
      * @return Whether or not the given link exists on this schema.
      */
-    public hasLink(rel: string): boolean {
-        return _.some(this.links, x => x.rel === rel);
+    public hasLink(rel: string | number): boolean {
+        if (_.isString(rel)) {
+            return _.some(this.links, x => x.rel === rel);
+        }
+        else if (_.isNumber(rel)) {
+            return !!this.links[rel];
+        }
+        debug('link existence asked with invalid "rel" type');
+        return null;
     }
 
 
@@ -306,7 +363,7 @@ export class SchemaNavigator {
         if (prop == null) {
             return void 0;
         }
-        return pointer.get(data, this.propertyPrefix + prop);
+        return pointer.get(data, fixJsonPointerPath(this.propertyPrefix + prop));
     }
 
     /**
@@ -370,13 +427,21 @@ export class SchemaNavigator {
      * @return The embedded shcema or null if it was not found.
      */
     public getEmbeddedSchema(schemaId: string): JsonSchema | null {
+        if (!_.isString(schemaId) || schemaId.length <= 3) {
+            throw new Error('Expected the schemaId to be a string, but got something else.');
+        }
+
+        if (schemaId[0] === '#') {
+            return pointer.get(this.schema, fixJsonPointerPath(schemaId.substr(1)));
+        }
+
         let sp = this.getSchemaIdsWithPointers()[schemaId];
         if (sp == null || sp === '') {
             debug(`requested embedded schema with id ${schemaId}, but could not find it`);
             return null;
         }
 
-        return pointer.get(this.schema, sp);
+        return pointer.get(this.schema, fixJsonPointerPath(sp));
     }
 
     /**
@@ -471,12 +536,12 @@ export class SchemaNavigator {
 /**
  * Fixes common mistakes in JsonPointers.
  */
-function fixJsonPointerPath(path: string): string {
+function fixJsonPointerPath(path: string, leadingSlash: boolean = false): string {
     if (path[0] !== '/' && path[0] !== '$') {
         path = '/' + path;
     }
-    if (path[path.length - 1] !== '/') {
-        path += '/';
+    if (!leadingSlash && path.length > 1 && path[path.length - 1] === '/') {
+        return path.substring(0, path.length - 1);
     }
     return path;
 }

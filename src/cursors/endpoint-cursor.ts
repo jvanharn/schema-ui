@@ -1,6 +1,8 @@
 import { ICursor, CursorLoadingState, PageChangeEvent, getAllCursorPages } from './cursor';
 import { ISearchableCursor } from './searchable-cursor';
 
+import { SchemaNavigator } from '../schema-navigator';
+
 import { SchemaHyperlinkDescriptor, IdentityValues } from '../models/index';
 
 import { ISchemaAgent, SchemaAgentResponse } from '../agents/schema-agent';
@@ -27,6 +29,13 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
      */
     public searchTermProperty: string = EndpointCursor.globalSearchTermProperty;
 
+    /**
+     * Get the schema.
+     */
+    public get schema(): SchemaNavigator {
+        return this.agent.schema;
+    }
+
     //region get/set limit
         private _limit: number = 40;
 
@@ -51,13 +60,13 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
     //endregion
 
     //region get/set current
-        private _current: number = 1;
+        private _current: number = null;
 
         /**
          * The page that the items collection currently reflects in the datasource.
          */
         public get current(): number {
-            return this._current;
+            return Math.max(this._current, 1);
         }
         public set current(value: number) {
             if (!_.isInteger(value) || value < 1) {
@@ -110,7 +119,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
      * Parameter is used to indicate that the cursor is loading.
      * @default CursorLoadingState.Uninitialized
      */
-    public readonly loadingState: CursorLoadingState = CursorLoadingState.Uninitialized;
+    public loadingState: CursorLoadingState = CursorLoadingState.Uninitialized;
 
     /**
      * Whether or not to automatically reload the page when the page limit or other property is changed.
@@ -190,7 +199,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
     }
 
     /**
-     * Select a page by number.
+     * Select a page by number.EndpointSchemaAgent
      *
      * @param page The 1-indexed page to navigate to.
      * @param forceReload Whether or not to force a reload of the age, even if we are already on the given page.
@@ -202,7 +211,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
         if (!_.isInteger(page) || page < 1) {
             return Promise.reject(new Error('Pagenumber has to be an integer of 1 or higher.'));
         }
-        if (page === this.current && !forceReload) {
+        if (this._current !== null && page === this._current && !forceReload) {
             return Promise.resolve(this.items);
         }
 
@@ -229,6 +238,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
         }
 
         // Emit event before the fetch
+        this.loadingState = CursorLoadingState.Loading;
         this.emit('beforePageChange', { page: page, items: null });
 
         // Execute the request.
@@ -250,6 +260,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
                     }
 
                     // Emit event after the succesfull fetch
+                    this.loadingState = this._items.length > 0 ? CursorLoadingState.Ready : CursorLoadingState.Empty;
                     this.emit('afterPageChange', { page: this.current, items: this.items });
 
                     // Set the X-applied properties

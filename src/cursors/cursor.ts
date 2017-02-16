@@ -1,4 +1,5 @@
 import { JsonSchema } from '../models/schema';
+import { SchemaNavigator } from '../schema-navigator';
 import { EventEmitter } from 'eventemitter3';
 
 import * as _ from 'lodash';
@@ -39,6 +40,11 @@ export interface ICursor<T> extends EventEmitter {
      * Items in the current page.
      */
     readonly items: T[];
+
+    /**
+     * Schema that represents the collection items.
+     */
+    readonly schema: SchemaNavigator;
 
     /**
      * Parameter is used to indicate that the cursor is loading.
@@ -157,26 +163,26 @@ export function getAllCursorPages<T>(cursor: ICursor<T>): Promise<T[]> {
     return new Promise((resolve, reject) => {
         var firstPage: Promise<T[]>;
         debug(`getAllCursorPages: fetching all pages of cursor for [${(cursor.constructor as any).name}]->{}`);
-        if (this.loadingState > CursorLoadingState.Uninitialized) {
-            if (this.loadingState === CursorLoadingState.Ready) {
+        if (cursor.loadingState > CursorLoadingState.Uninitialized) {
+            if (cursor.loadingState === CursorLoadingState.Ready) {
                 debug(`getAllCursorPages: firstpage already loaded`);
-                firstPage = Promise.resolve(this.items);
+                firstPage = Promise.resolve(cursor.items);
             }
             else {
                 debug(`getAllCursorPages: firstpage loaded on afterPageChange event`);
-                firstPage = new Promise(resolve => this.once('afterPageChange', (x: PageChangeEvent<T>) => resolve(x.items)));
+                firstPage = new Promise(resolve => cursor.once('afterPageChange', (x: PageChangeEvent<T>) => resolve(x.items)));
             }
         }
         else {
-            debug(`getAllCursorPages: firstpage loaded by select(1)`);
-            firstPage = this.select(1);
+            debug(`getAllCursorPages: firstpage loaded by select(1) because of state [${CursorLoadingState[cursor.loadingState]}]`);
+            firstPage = cursor.select(1);
         }
 
         firstPage
             .then(items => {
-                var promises: Promise<T[]>[] = [Promise.resolve(this.items)];
-                for (var i = 2; i <= this.totalPages; i++) {
-                    promises.push(this.select(i));
+                var promises: Promise<T[]>[] = [Promise.resolve(cursor.items)];
+                for (var i = 2; i <= cursor.totalPages; i++) {
+                    promises.push(cursor.select(i));
                 }
                 Promise
                     .all(promises)

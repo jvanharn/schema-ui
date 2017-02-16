@@ -1,8 +1,10 @@
 import { CursorLoadingState, PageChangeEvent, getAllCursorPages } from './cursor';
 import { CollectionFilterDescriptor, CollectionFilterOperator } from './filterable-cursor';
 import { CollectionSortDescriptor, SortingDirection, inverseSortMode } from './sortable-cursor';
-import { IColumnizedCursor, CursorColumnDefinition } from './columnized-cursor';
+import { IColumnizedCursor } from './columnized-cursor';
+import { SchemaColumnDescriptor } from '../models/table';
 import { ISearchableCursor } from './searchable-cursor';
+import { SchemaNavigator } from '../schema-navigator';
 
 import { EventEmitter } from 'eventemitter3';
 import * as pointer from 'json-pointer';
@@ -38,13 +40,13 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
     //endregion
 
     //region get/set current
-        protected _current: number = 1;
+        protected _current: number = null;
 
         /**
          * The page that the items collection currently reflects in the datasource.
          */
         public get current(): number {
-            return this._current;
+            return Math.max(this._current, 1);
         }
         public set current(value: number) {
             if (!_.isInteger(value) || value < 1) {
@@ -107,16 +109,16 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         /**
          * Set and get the columns for the cursor and set primaries
          */
-        public get columns(): CursorColumnDefinition[] {
+        public get columns(): SchemaColumnDescriptor[] {
             return this._columns;
         }
-        public set columns(value: CursorColumnDefinition[]) {
+        public set columns(value: SchemaColumnDescriptor[]) {
             if (!_.isArray(value)) {
                 throw new Error('Expected array');
             }
             this._columns = value.slice();
         }
-        public _columns: CursorColumnDefinition[] = [];
+        public _columns: SchemaColumnDescriptor[] = [];
     //endregion
 
     //region get/set filters
@@ -143,7 +145,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
      * Parameter is used to indicate that the cursor is loading.
      * @default CursorLoadingState.Uninitialized
      */
-    public readonly loadingState: CursorLoadingState = CursorLoadingState.Uninitialized;
+    public loadingState: CursorLoadingState = CursorLoadingState.Uninitialized;
 
     /**
      * Whether or not the search terms were applied.
@@ -176,8 +178,10 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
      * @param _wrapped The wrapped collection.
      */
     public constructor(
+        public readonly schema: SchemaNavigator,
         private _wrapped: T[],
-        columns: CursorColumnDefinition[],
+        intialPage: number | null,
+        columns?: SchemaColumnDescriptor[],
     ) {
         super();
         this._count = _wrapped.length;
@@ -190,7 +194,9 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
 
         this.columns = columns;
 
-        this.select(1);
+        if (intialPage !== null) {
+            this.select(intialPage || 1);
+        }
     }
 
 //region Page changing
@@ -273,6 +279,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
 
         // Set cursor state
         this._current = pageNumber;
+        this.loadingState = this._items.length > 0 ? CursorLoadingState.Ready : CursorLoadingState.Empty;
         return Promise.resolve(this.items);
     }
 //endregion
@@ -304,7 +311,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
          *
          * @return A promise resolving into all the items on the current page in the filtered collection.
          */
-        public filterBy(filter: CollectionFilterDescriptor | CollectionFilterDescriptor[], replace: boolean = false): this {
+        public filterBy(filter: CollectionFilterDescriptor | CollectionFilterDescriptor[], replace: boolean = true): this {
             if (replace === true) {
                 this._filters = _.isArray(filter) ? filter : [filter];
             }
@@ -348,7 +355,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
          *
          * @return A promise resolving into all the items on the current page in the sorted collection.
          */
-        public sortBy(sort: CollectionSortDescriptor | CollectionSortDescriptor[], replace: boolean = false): this {
+        public sortBy(sort: CollectionSortDescriptor | CollectionSortDescriptor[], replace: boolean = true): this {
             if (replace === true) {
                 this._sorters = _.isArray(sort) ? sort : [sort];
             }
@@ -387,18 +394,18 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         /**
          * Sort the cursor by the given column name.
          *
-         * @param columnName The name of the column to sort by.
+         * @param columnId The id of the column to sort by.
          * @param direction The direction to sort in (ascending/descending).
          *
          * @return A promise resolving in the sorted first page or rejected when the column is not sortable.
          */
-        public sortByColumn(columnName: string, direction: SortingDirection): this {
-            let col = _.find(this._columns, x => x.name === columnName);
+        public sortByColumn(columnId: string, direction: SortingDirection): this {
+            let col = _.find(this._columns, x => x.id === columnId);
             if (!col.sortable) {
-                throw new Error(`Unable to sort for column "${columnName}", it says it cant be sorted on.`);
+                throw new Error(`Unable to sort for column "${columnId}", it says it cant be sorted on.`);
             }
             this._sorters.push({
-                path: !!(col as any)['path'] ? (col as any)['path'] : `/${_.upperFirst(col.name)}`,
+                path: !!col.path ? col.path : `/${col.id}`,
                 direction
             });
             return this;
@@ -407,19 +414,19 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         /**
          * Filter the cursor by the given column name and value.
          *
-         * @param columnName The name of the column to filter on.
+         * @param columnId The id of the column to filter on.
          * @param operator The comparison operator to apply on the column-value and the given value.
          * @param value The value to commpare with.
          *
          * @return A promise resolving in the filtered first page or rejected when the column is not filterable.
          */
-        public filterByColumn(columnName: string, operator: CollectionFilterOperator, value: any): this {
-            let col = _.find(this._columns, x => x.name === columnName);
+        public filterByColumn(columnId: string, operator: CollectionFilterOperator, value: any): this {
+            let col = _.find(this._columns, x => x.id === columnId);
             if (!col.filterable) {
-                throw new Error(`Unable to filter for column "${columnName}", it says it cant be filtered on.`);
+                throw new Error(`Unable to filter for column "${columnId}", it says it cant be filtered on.`);
             }
             this.filters.push({
-                path: !!(col as any)['path'] ? (col as any)['path'] : `/${_.upperFirst(col.name)}`,
+                path: !!col.path ? col.path : `/${col.id}`,
                 operator,
                 value
             });

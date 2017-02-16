@@ -18,11 +18,11 @@ export interface IFilterableCursor<T> extends ICursor<T> {
      * Filters the cursor's collection by the given filter(s) and applies them, and reload the current page.
      *
      * @param filter The (additional) filter(s) to filter the collection with.
-     * @param replace Whether or not the given filter(s) should replace the currently set filters.
+     * @param replace Whether or not the given filter(s) should replace the currently set filters. Defaults to replacing.
      *
      * @return A promise resolving into all the items on the current page in the filtered collection.
      */
-    filterBy(filter: CollectionFilterDescriptor | CollectionFilterDescriptor[], replace: boolean): this;
+    filterBy(filter: CollectionFilterDescriptor | CollectionFilterDescriptor[], replace?: boolean): this;
 
     /**
      * Clear the specified filter from the filter-list, and reload the current page.
