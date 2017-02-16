@@ -303,7 +303,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
     /**
      * Used to execute a page request with an active search filter.
      */
-    public search(terms: string, initialPage: number = 1): this {
+    public search(terms: string): this {
         this._terms = terms;
         this.isSearchApplied = false;
         return this;

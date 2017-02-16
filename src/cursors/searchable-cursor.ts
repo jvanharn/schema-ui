@@ -16,6 +16,8 @@ export interface ISearchableCursor<T> extends ICursor<T> {
 
     /**
      * Used to execute a page request with an active search filter.
+     *
+     * To apply this filter and any other filters you have applied, call select(1).
      */
-    search(terms: string, initialPage?: number): this;
+    search(terms: string): this;
 }
