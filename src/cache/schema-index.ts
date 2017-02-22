@@ -3,6 +3,9 @@ import * as pointer from 'json-pointer';
 import { ISchemaCache } from './schema-cache';
 import { JsonSchema } from '../models/schema';
 
+import * as debuglib from 'debug';
+var debug = debuglib('schema:cache:index');
+
 /**
  * Makes the retrieval of schema's by identity faster by creating an index of schema identities.
  *
@@ -35,7 +38,12 @@ export class SchemaIndex implements ISchemaCache {
     public getSchema(id: string): JsonSchema {
         // Check the index.
         if (!!this.index[id]) {
-            return pointer.get(this.cache.getSchema(this.index[id][0]), this.index[id][1]);
+            try {
+                return pointer.get(this.cache.getSchema(this.index[id][0]), this.index[id][1]);
+            }
+            catch (e) {
+                debug(`unable to get the subschema as pointed to by the schema index [${id}] (should not be able to happen)`);
+            }
         }
 
         // No index entry, regular fetch.
@@ -80,14 +88,12 @@ export class SchemaIndex implements ISchemaCache {
      * @param baseId The schema Url with an hastag and nothing after that.
      * @param prefix The JSON Pointer to prefix before schema pointers.
      */
-    private fillIndexForSchema(schema: JsonSchema, schemaId?: string, baseId?: string, prefix: string = '/'): void {
+    private fillIndexForSchema(schema: JsonSchema, schemaId?: string, prefix: string = '/'): void {
         if (schemaId == null) {
             schemaId = String(schema.id);
         }
 
-        if (baseId == null) {
-            baseId = schemaId.substring(0, schemaId.lastIndexOf('#') + 1);
-        }
+        var baseId = schemaId.substring(0, schemaId.lastIndexOf('#') + 1);
 
         // Checkout the definitions, if available.
         if (!!schema.definitions) {
@@ -98,13 +104,14 @@ export class SchemaIndex implements ISchemaCache {
                     // Add an index entry for the path with the name of the definition
                     this.index[baseId + pointer] = [schemaId, pointer];
 
-                    // Add an index entry, if the subschema has an id
-                    if (!!schema.definitions[name].id) {
+                    // Add an index entry, if the subschema has an id and doesnt already exist
+                    if (!!schema.definitions[name].id && !this.index[schema.definitions[name].id]) {
                         this.index[schema.definitions[name].id] = [schemaId, pointer];
+                        debug(`lifted the sub-schema with id [${schema.definitions[name].id}] from [${baseId}${pointer}]`);
                     }
 
                     // Checkout the children.
-                    this.fillIndexForSchema(schema.definitions[name], schemaId, baseId, pointer + '/');
+                    this.fillIndexForSchema(schema.definitions[name], schemaId, pointer + '/');
                 }
             }
         }

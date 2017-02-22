@@ -9,7 +9,7 @@ import {
     IdentityValues,
     EntityIdentity
 } from '../models/index';
-import { ISchemaAgent, SchemaAgentResponse, HeaderDictionary } from './schema-agent';
+import { ISchemaAgent, SchemaAgentResponse, SchemaAgentRejection, HeaderDictionary } from './schema-agent';
 import { IAuthenticatedSchemaAgent } from './authenticated-schema-agent';
 import { IAgentAuthenticator } from '../authenticators/agent-authenticator';
 import { ISchemaCache } from '../cache/schema-cache';
@@ -153,9 +153,42 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
             .then(xhr => {
                 debug(`completed [${this.schema.root.id}].links.${link.rel}`);
                 return {
+                    code: xhr.status,
                     headers: xhr.headers,
                     body: xhr.data
-                };
+                } as SchemaAgentResponse<TResponse>;
+            })
+            .catch((error: Error & { response: Axios.AxiosXHR<any> }) => {
+                var errorToken: string = 'UNKNOWN_ERROR', errorRoot: any, xhr = error.response;
+                if (!xhr.data) {
+                    errorRoot = xhr.data;
+                    errorToken = xhr.statusText;
+                }
+                else {
+                    if (_.size(xhr.data as any) === 1) {
+                        _.each(xhr.data, x => errorRoot = x);
+                    }
+                    else {
+                        errorRoot = xhr.data;
+                    }
+
+                    if (_.isArray(errorRoot)) {
+                        errorRoot = _.first(errorRoot);
+                    }
+
+                    let keys = _.keys(errorRoot),
+                        tokenKey = _.find(keys, x => _.includes(['token', 'message', 'detail'], x.toLowerCase()));
+                    if (!!tokenKey) {
+                        errorToken = String(errorRoot[tokenKey]);
+                    }
+                }
+
+                throw {
+                    code: xhr.status,
+                    headers: xhr.headers,
+                    token: _.snakeCase(errorToken).toUpperCase(),
+                    data: errorRoot
+                } as SchemaAgentRejection;
             });
     }
 
@@ -424,15 +457,15 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
             return Promise.resolve(link.schema);
         }
 
+        // Check if the schema is a local reference
+        if (!!link.schema && link.schema['$ref'] != null && link.schema['$ref'][0] === '#') {
+            return Promise.resolve(this.schema.getEmbeddedSchema(link.schema['$ref']));
+        }
+
         // Check if the schema exists in our cache.
         var schema: JsonSchema;
         if (!!link.schema && link.schema['$ref'] != null && !!(schema = this.cache.getSchema(link.schema['$ref']))) {
             return Promise.resolve(schema);
-        }
-
-        // Check if the schema is a local reference
-        if (!!link.schema && link.schema['$ref'] != null && link.schema['$ref'][0] === '#') {
-            return Promise.resolve(this.schema.getEmbeddedSchema(link.schema['$ref']));
         }
 
         // Fetch it using our fetcher instance.

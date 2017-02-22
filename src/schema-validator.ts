@@ -77,6 +77,9 @@ export class SchemaValidator {
      * @return The result of the validation.
      */
     public validateProperty(propertyName: string, value: any): Promise<ValidationResult> {
+        if (propertyName == null || propertyName.length <= 1) {
+            throw new Error(`Invalid property name given "${propertyName}"`);
+        }
         return this._validateDefinition(this.schema.propertyRoot[propertyName], value);
     }
 

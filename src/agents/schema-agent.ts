@@ -133,9 +133,16 @@ export interface ISchemaAgent {
 }
 
 /**
- * Object that is returned
+ * Object that is returned as representation for what the server responded.
  */
 export interface SchemaAgentResponse<T> {
+    /**
+     * The http-like response code as returned by the remote service.
+     *
+     * If undefined 200 may be assumed.
+     */
+    code?: number;
+
     /**
      * Headers or other meta information send with the request, which was not part of the body.
      */
@@ -145,6 +152,34 @@ export interface SchemaAgentResponse<T> {
      * The response body.
      */
     body: T;
+}
+
+/**
+ * Object that is returned as representation by a rejected response. (In the promise catch condition)
+ */
+export interface SchemaAgentRejection {
+    /**
+     * The http-like error code as returned by the remote service.
+     */
+    code: number;
+
+    /**
+     * The error message token as returned by the server.
+     *
+     * Must be an a token that uniquely identifies the type of error that occurs.
+     * Must only contain uppercase alphabetic characters and underscores.
+     */
+    token: string;
+
+    /**
+     * Headers or other meta information send with the request, which was not part of the body.
+     */
+    headers: HeaderDictionary;
+
+    /**
+     * Miscellaneous error data to further identify the error with. (Can also be the entire body of the request)
+     */
+    data: any;
 }
 
 export type HeaderDictionary = { [header: string]: string };

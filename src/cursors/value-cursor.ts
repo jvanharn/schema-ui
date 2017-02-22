@@ -449,7 +449,13 @@ export function sortCollectionBy<T>(collection: T[], sorters: CollectionSortDesc
  * Applies CollectionFilterDescriptor to a collection.
  */
 export function filterCollectionBy<T>(collection: T[], filters: CollectionFilterDescriptor[]): T[] {
-    return _.filter(collection, x => _.every(filters, f => applyFilter(f, pointer.get(x, f.path))));
+    return _.filter(collection, x => _.every(filters, f => {
+        try {
+            return applyFilter(f, pointer.get(x, f.path))
+        } catch(e) {
+            return true;
+        }
+    }));
 }
 
 /**
