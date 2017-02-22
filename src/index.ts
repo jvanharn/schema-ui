@@ -18,7 +18,8 @@ export * from './fetchers/authenticated-schema-fetcher';
 export * from './fetchers/null-schema-fetcher';
 
 export { SchemaNavigator } from './schema-navigator';
-export * from './schema-validator';
+
+export * from './validator/index';
 
 export * from './authenticators/agent-authenticator';
 export * from './authenticators/basic-agent-authenticator';
