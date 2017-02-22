@@ -1,4 +1,4 @@
-import { JsonSchema, CommonJsonSchema } from '../models/index';
+import { JsonSchema, CommonJsonSchema, JsonPatchOperation } from '../models/index';
 import { SchemaNavigator } from '../schema-navigator';
 import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
@@ -17,7 +17,12 @@ export class AjvSchemaValidator implements ISchemaValidator {
     /**
      * The Schema validator.
      */
-    private _validator: ajv.Ajv;
+    protected validator: ajv.Ajv;
+
+    /**
+     * The compiled main schema.
+     */
+    protected compiledSchema: Promise<ajv.ValidateFunction>;
 
     /**
      * @param schema Schema to validate with.
@@ -30,14 +35,40 @@ export class AjvSchemaValidator implements ISchemaValidator {
         protected readonly fetcher?: ISchemaFetcher,
         options?: ajv.Options
     ) {
-        this._validator = new ajv(
+        this.validator = new ajv(
             _.assign({
                 formats: CommonFormats,
                 loadSchema: (uri: string, cb: (err: Error, schema: Object) => any) =>
                     this.resolveMissingSchemaReference(uri)
                         .then(x => cb(null, x))
-                        .catch(e => cb(e, null)),
+                        .catch(e => cb(e, null))
             } as ajv.Options, options));
+        this.validator.addKeyword('field', {
+            errors: false,
+            metaSchema: {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string"
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "data": {
+                        "type": "object"
+                    },
+                    "link": {
+                        "oneOf": [
+                            { "type": "string" },
+                            { "type": "integer" }
+                        ]
+                    },
+                    "targetIdentity": {
+                        "type": "string"
+                    }
+                }
+            }
+        } as any);
     }
 
     /**
@@ -48,7 +79,17 @@ export class AjvSchemaValidator implements ISchemaValidator {
      * @return The result of the validation.
      */
     public validate<T>(item: T): Promise<ValidationResult> {
-        return this._validateDefinition(this.schema.root, item);
+        if (!this.compiledSchema) {
+            this.compiledSchema = new Promise((resolve, reject) =>
+                this.validator.compileAsync(this.schema.root, (err, validate) => {
+                    if (err != null) {
+                        return reject(err);
+                    }
+                    resolve(validate);
+                }));
+        }
+        return this.compiledSchema.then(validator =>
+            (validator(item) as ajv.Thenable<boolean>).then(valid => this.mapValidationResult(valid, validator.errors)));
     }
 
     /**
@@ -63,7 +104,8 @@ export class AjvSchemaValidator implements ISchemaValidator {
         if (propertyName == null || propertyName.length <= 1) {
             return Promise.reject(new Error(`Invalid property name given "${propertyName}"`));
         }
-        return this._validateDefinition(this.schema.propertyRoot[propertyName], value);
+        return this.compiledSchema.then(validator =>
+            (validator(value, this.schema.getPropertyPointer(propertyName)) as ajv.Thenable<boolean>).then(valid => this.mapValidationResult(valid, validator.errors)));
     }
 
     /**
@@ -78,9 +120,31 @@ export class AjvSchemaValidator implements ISchemaValidator {
     }
 
     /**
-     * Takes an schema reference and makes sure it
+     * Maps the AJV specific error structs to lbrary cmpatible structs.
+     */
+    protected mapValidationResult(valid: boolean, errors: ajv.ErrorObject[]): ValidationResult {
+        return {
+            valid,
+            errors: _.map(errors, e => ({
+                code: e.keyword,
+                message: e.message,
+                params: e.params,
+                description: e.message,
+                path: e.dataPath
+            } as ValidationError))
+        } as ValidationResult;
+    }
+
+    /**
+     * Takes an schema reference and resolves it to a schema.
+     *
+     * @param ref The reference to resolve.
+     *
+     * @return A promise for an JsonSchema.
      */
     protected resolveMissingSchemaReference(ref: string): Promise<JsonSchema> {
+        if () {
 
+        }
     }
 }

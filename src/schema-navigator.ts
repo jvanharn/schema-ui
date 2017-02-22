@@ -29,6 +29,11 @@ export class SchemaNavigator {
     protected schemaIdPointerMap: { [schemaId: string]: string };
 
     /**
+     * Cache where a list of propertyRoot properties is mapped to their schema json pointers.
+     */
+    protected propertyRootSchemaPointerMap: { [property: string]: string };
+
+    /**
      * Construct a new schema navigator.
      * @param schema The schema to wrap as navigable.
      * @param propertyPrefix The json-pointer prefix of this jsonschema when fetching property values from objects/values/... that are validated by this schema.
@@ -40,7 +45,7 @@ export class SchemaNavigator {
         public readonly schemaRootPrefix?: string
     ) {
         if (this.schema == null) {
-            debug('tried to create navigable-schema with empty schema');
+            debug('[warn] tried to create navigable-schema with empty schema');
             throw new Error('Cannot make a null schema navigable, the schema property is required.');
         }
 
@@ -154,6 +159,10 @@ export class SchemaNavigator {
         // begin with any regular properties, if they are set
         if (_.isPlainObject(this.root.properties) && _.size(this.root.properties) > 0) {
             this._patternPropertyRootCache = _.assign({}, this.root.properties) as SchemaPropertyMap<JsonSchema>;
+
+            this.createPropertyRootCache(
+                fixJsonPointerPath((this.schemaRootPrefix || '/') + 'properties', true),
+                this.root.properties);
         }
         else {
             this._patternPropertyRootCache = { };
@@ -169,6 +178,11 @@ export class SchemaNavigator {
         _.each(this.root.patternProperties, (schema: JsonSchema, pattern: string) => {
             if (matchable.search(pattern) >= 0) {
                 this._patternPropertyRootCache = _.assign(this._patternPropertyRootCache, schema.properties) as SchemaPropertyMap<JsonSchema>;
+
+                this.createPropertyRootCache(
+                    fixJsonPointerPath((this.schemaRootPrefix || '/') + `patternProperties/${pattern}/properties`, true),
+                    schema.properties);
+
                 if (_.isArray(schema.required)) {
                     this._patternRequiredPropertyCache.push(...schema.required);
                 }
@@ -190,13 +204,25 @@ export class SchemaNavigator {
             return this._patternPropertyRootCache;
         }
         else if (this.schema.type === 'object') {
+            if (!this.propertyRootSchemaPointerMap) {
+                this.createPropertyRootCache(
+                    fixJsonPointerPath((this.schemaRootPrefix || '/') + 'properties', true),
+                    this.root.properties);
+            }
+
             return this.root.properties;
         }
-        else if (this.schema.type === 'array') {
+        else if (this.schema.type === 'array' && !_.isArray(this.root.items as JsonSchema)) {
+            if (!this.propertyRootSchemaPointerMap) {
+                this.createPropertyRootCache(
+                    fixJsonPointerPath((this.schemaRootPrefix || '/') + 'items/properties', true),
+                    this.root.properties);
+            }
+
             return (this.root.items as JsonSchema).properties;
         }
         else {
-            return this.root.properties || { };
+            return { };
         }
     }
 
@@ -359,11 +385,37 @@ export class SchemaNavigator {
      * @return The value of the property or undefined if not set.
      */
     public getPropertyValue(name: string, data: any): any {
+        return pointer.get(data, this.getPropertyPointer(name));
+    }
+
+    /**
+     * Get the property data pointer.
+     *
+     * Get the JSON Pointer pointing to the given field property value in the data object described by this schema.
+     *
+     * @param name The name of the property to get the pointer to.
+     *
+     * @return The pointer to the given property value.
+     */
+    public getPropertyPointer(name: string): string {
         let prop = _.findKey(this.propertyRoot, (v, k) => k.toLowerCase() === name.toLowerCase())
         if (prop == null) {
             return void 0;
         }
-        return pointer.get(data, fixJsonPointerPath(this.propertyPrefix + prop));
+        return fixJsonPointerPath(this.propertyPrefix + prop);
+    }
+
+    /**
+     * Get the property schema pointer.
+     *
+     * Get the JSON Pointer pointing to the given field property schema/descriptor in this schema
+     *
+     * @param name The name of the property to get the pointer to.
+     *
+     * @return The pointer to the given property schema.
+     */
+    public getPropertySchemaPointer(name: string): string {
+        return this.propertyRootSchemaPointerMap[String(name).toLowerCase()];
     }
 
     /**
@@ -390,6 +442,19 @@ export class SchemaNavigator {
             result[prop] = this.getPropertyValue(prop, data);
         }
         return result;
+    }
+
+    /**
+     * Creates a cache with properties and how to access them in the schema.
+     */
+    protected createPropertyRootCache(basePath: string, obj: { [key: string]: any }): void {
+        if (!this.propertyRootSchemaPointerMap) {
+            this.propertyRootSchemaPointerMap = { };
+        }
+
+        _.each(obj, (val, key) => {
+            this.propertyRootSchemaPointerMap[key.toLowerCase()] = basePath + key;
+        });
     }
 //endregion
 
