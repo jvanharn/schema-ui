@@ -1,6 +1,5 @@
 import * as _ from 'lodash';
 import * as pointer from 'json-pointer';
-import schema = require('z-schema');
 
 import * as debuglib from 'debug';
 var debug = debuglib('schema:navigator');
@@ -59,13 +58,25 @@ export class SchemaNavigator {
         else {
             this.schemaRootPrefix = this.guessSchemaRootPrefix();
         }
+
+        // Make sure this schema has an id set (otherwise we wont accept it)
+        if (this.schemaId == null) {
+            throw new Error('Schema\'s without an identity are not allowed. If you want to use an sub-schema, please use the schemaRootPrefix property instead.');
+        }
     }
 
     /**
      * Get the identifier of the underlying schema.
      */
     public get schemaId(): string {
-        return this.schema.id || this.root.id;
+        return this.root.id || this.schema.id;
+    }
+
+    /**
+     * Get the underlying/wrapped schema.
+     */
+    public get original(): Readonly<JsonSchema> {
+        return this.schema;
     }
 
     /**
@@ -562,51 +573,14 @@ export class SchemaNavigator {
             !!(objectKey = _.findKey(this.schema.properties, (v, k) => k.toLowerCase() === 'data' || k.toLowerCase() === 'items'))
         ) {
             if (this.schema.properties[objectKey].type === 'array') {
-                return ` /properties/${objectKey}/items/`;
+                return `/properties/${objectKey}/items/`;
             }
             else if(this.schema.properties[objectKey].type === 'object') {
-                return ` /properties/${objectKey}/`;
+                return `/properties/${objectKey}/`;
             }
         }
 
         // Just assume the root is ok.
         return '/';
     }
-
-    /**
-     * Get the name of the schema entity.
-     *
-     * @param schema The schema to get the entity for.
-     *
-     * @return The name of the schema or null.
-     */
-    public static getSchemaEntity(schema: JsonSchema): string | null {
-        if (!!(schema as CommonJsonSchema).entity) {
-            return (schema as CommonJsonSchema).entity;
-        }
-        if (!!schema.id) {
-            return this.convertSchemaIdToEntityName(schema.id);
-        }
-        return null;
-    }
-
-    /**
-     * Simple attempt at converting a schema id to an entity name without having the actual schema.
-     */
-    public static convertSchemaIdToEntityName(id: string): string {
-        return _.upperFirst(_.camelCase(_.last(_.split(id, '/'))));
-    }
-}
-
-/**
- * Fixes common mistakes in JsonPointers.
- */
-function fixJsonPointerPath(path: string, leadingSlash: boolean = false): string {
-    if (path[0] !== '/' && path[0] !== '$') {
-        path = '/' + path;
-    }
-    if (!leadingSlash && path.length > 1 && path[path.length - 1] === '/') {
-        return path.substring(0, path.length - 1);
-    }
-    return path;
 }

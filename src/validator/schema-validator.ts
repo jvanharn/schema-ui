@@ -14,6 +14,11 @@ import * as pointer from 'json-pointer';
  */
 export interface ISchemaValidator {
     /**
+     * Schema navigator.
+     */
+    schema: SchemaNavigator;
+
+    /**
      * Validate entity item instance with the entire schema.
      *
      * @param item The item that should be validated by the schema this schema-validator represents.

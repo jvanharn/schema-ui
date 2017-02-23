@@ -20,7 +20,7 @@ import { CollectionSortDescriptor } from '../cursors/sortable-cursor';
 import { EndpointCursor } from '../cursors/endpoint-cursor';
 
 import { SchemaNavigator } from '../schema-navigator';
-import { SchemaValidator } from '../schema-validator';
+import { ISchemaValidator, AjvSchemaValidator } from '../validator/index';
 
 import * as urltemplate from 'url-template';
 import { compare, apply } from 'fast-json-patch';
@@ -80,11 +80,11 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
         public readonly schema: SchemaNavigator,
         protected readonly cache: ISchemaCache,
         protected readonly fetcher: ISchemaFetcher,
-        public readonly validator?: SchemaValidator,
+        public readonly validator?: ISchemaValidator,
         public readonly parent?: ISchemaAgent
     ) {
         if (validator == null) {
-            this.validator = new SchemaValidator(schema, cache, fetcher);
+            this.validator = new AjvSchemaValidator(schema, cache, fetcher);
         }
     }
 
@@ -111,7 +111,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
                         debug(`validate request against [${this.schema.root.id}] own schema`);
                         return this.validator.validate(data);
                     }
-                    let validator = SchemaValidator.fromSchema(requestSchema, this.cache, this.fetcher);
+                    let validator = new AjvSchemaValidator(new SchemaNavigator(requestSchema), this.cache, this.fetcher);
                     debug(`validate request against [${this.schema.root.id}].links.${link.rel}.requestSchema`);
                     return validator.validate(data);
                 }

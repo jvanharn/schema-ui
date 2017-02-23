@@ -22,7 +22,7 @@ export interface JsonSchema {
      *
      * If present, the value for this keyword MUST be a string, and MUST represent a valid URI-reference [RFC3986]. This value SHOULD be normalized, and SHOULD NOT be an empty fragment <#> or an empty string <>.
      */
-    id: string;
+    id?: string;
 
     /**
      * Related schemas linked to inside the same schema.

@@ -9,11 +9,18 @@ import { ISchemaValidator, ValidationError, ValidationResult } from './schema-va
 import * as ajv from 'ajv';
 import * as _ from 'lodash';
 import * as pointer from 'json-pointer';
+import * as debuglib from 'debug';
+var debug = debuglib('schema:validator:ajv');
 
 /**
  * Class that helps with the validation of a schema or it's properties.
  */
 export class AjvSchemaValidator implements ISchemaValidator {
+    /**
+     * Formats globally registered.
+     */
+    protected static formats: { [name: string]: (str: string) => boolean } = { };
+
     /**
      * The Schema validator.
      */
@@ -37,38 +44,44 @@ export class AjvSchemaValidator implements ISchemaValidator {
     ) {
         this.validator = new ajv(
             _.assign({
-                formats: CommonFormats,
+                formats: _.assign({}, CommonFormats, AjvSchemaValidator.formats),
                 loadSchema: (uri: string, cb: (err: Error, schema: Object) => any) =>
                     this.resolveMissingSchemaReference(uri)
                         .then(x => cb(null, x))
                         .catch(e => cb(e, null))
             } as ajv.Options, options));
-        this.validator.addKeyword('field', {
-            errors: false,
-            metaSchema: {
-                "type": "object",
-                "properties": {
-                    "type": {
-                        "type": "string"
-                    },
-                    "visible": {
-                        "type": "boolean"
-                    },
-                    "data": {
-                        "type": "object"
-                    },
-                    "link": {
-                        "oneOf": [
-                            { "type": "string" },
-                            { "type": "integer" }
-                        ]
-                    },
-                    "targetIdentity": {
-                        "type": "string"
-                    }
-                }
-            }
-        } as any);
+
+        // this.validator.addKeyword('field', {
+        //     metaSchema: {
+        //         type: "object",
+        //         properties: {
+        //             type: {
+        //                 type: "string"
+        //             },
+        //             visible: {
+        //                 type: "boolean"
+        //             },
+        //             data: {
+        //                 type: "object"
+        //             },
+        //             link: {
+        //                 oneOf: [
+        //                     { type: "string" },
+        //                     { type: "integer" }
+        //                 ]
+        //             },
+        //             targetIdentity: {
+        //                 type: "string"
+        //             }
+        //         },
+        //         dependencies: {
+        //             targetIdentity: ["link"]
+        //         },
+        //         additionalProperties: false
+        //     } as JsonSchema
+        // } as any);
+
+        this.ensureSchemaCompiled();
     }
 
     /**
@@ -79,15 +92,7 @@ export class AjvSchemaValidator implements ISchemaValidator {
      * @return The result of the validation.
      */
     public validate<T>(item: T): Promise<ValidationResult> {
-        if (!this.compiledSchema) {
-            this.compiledSchema = new Promise((resolve, reject) =>
-                this.validator.compileAsync(this.schema.root, (err, validate) => {
-                    if (err != null) {
-                        return reject(err);
-                    }
-                    resolve(validate);
-                }));
-        }
+        this.ensureSchemaCompiled();
         return this.compiledSchema.then(validator =>
             (validator(item) as ajv.Thenable<boolean>).then(valid => this.mapValidationResult(valid, validator.errors)));
     }
@@ -104,6 +109,7 @@ export class AjvSchemaValidator implements ISchemaValidator {
         if (propertyName == null || propertyName.length <= 1) {
             return Promise.reject(new Error(`Invalid property name given "${propertyName}"`));
         }
+        this.ensureSchemaCompiled();
         return this.compiledSchema.then(validator =>
             (validator(value, this.schema.getPropertyPointer(propertyName)) as ajv.Thenable<boolean>).then(valid => this.mapValidationResult(valid, validator.errors)));
     }
@@ -136,6 +142,22 @@ export class AjvSchemaValidator implements ISchemaValidator {
     }
 
     /**
+     * Makes sure the schema is compiled JIT.
+     */
+    protected ensureSchemaCompiled(): void {
+        if (!this.compiledSchema) {
+            this.compiledSchema = new Promise((resolve, reject) =>
+                this.validator.compileAsync(this.schema.root, (err, validate) => {
+                    if (err != null) {
+                        debug(`compilation failed of schema [${this.schema.schemaId}]: ${err.message}`);
+                        return reject(err);
+                    }
+                    resolve(validate);
+                }));
+        }
+    }
+
+    /**
      * Takes an schema reference and resolves it to a schema.
      *
      * @param ref The reference to resolve.
@@ -143,8 +165,32 @@ export class AjvSchemaValidator implements ISchemaValidator {
      * @return A promise for an JsonSchema.
      */
     protected resolveMissingSchemaReference(ref: string): Promise<JsonSchema> {
-        if () {
-
+        if (!!this.cache) {
+            let schema = this.cache.getSchema(ref);
+            if (!!schema) {
+                return Promise.resolve(schema);
+            }
         }
+
+        if (!!this.fetcher) {
+            return this.fetcher.fetchSchema(ref).then(schema => {
+                if (!!this.cache) {
+                    this.cache.setSchema(schema);
+                }
+                return schema;
+            });
+        }
+
+        return Promise.reject(new Error(`Unable to find the requested schema "${ref}"`));
+    }
+
+    /**
+     * Register custom format.
+     *
+     * @param name The name of the format.
+     * @param format The format validation function.
+     */
+    public static registerFormat(name: string, format: (str: string) => boolean): void {
+        AjvSchemaValidator.formats[name] = format;
     }
 }
