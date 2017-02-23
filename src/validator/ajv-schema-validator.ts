@@ -1,5 +1,5 @@
 import { JsonSchema, CommonJsonSchema, JsonPatchOperation } from '../models/index';
-import { SchemaNavigator } from '../schema-navigator';
+import { SchemaNavigator } from '../navigator/schema-navigator';
 import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
 

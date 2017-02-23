@@ -16,7 +16,12 @@ import {
 
     SchemaHyperlinkDescriptor,
     SchemaColumnDescriptor
-} from './models/index';
+} from '../models/index';
+import {
+    fixJsonPointerPath,
+    getApplicablePropertyDefinitions,
+    getSchemaEntity
+} from './utils';
 
 /**
  * Helper object for retrieving information from json-schema's.
@@ -33,15 +38,18 @@ export class SchemaNavigator {
     protected propertyRootSchemaPointerMap: { [property: string]: string };
 
     /**
+     * A list of all the definitions that apply to the given propertyPrefix.
+     */
+    protected readonly propertyDefinitionRoots: string[];
+
+    /**
      * Construct a new schema navigator.
      * @param schema The schema to wrap as navigable.
-     * @param propertyPrefix The json-pointer prefix of this jsonschema when fetching property values from objects/values/... that are validated by this schema.
-     * @param schemaRootPrefix The json-pointer prefix of what value path should be considered the 'root' "properties" object containing the properties for listing fields (for JsonFormSchemas).
+     * @param propertyPrefix The json-pointer that is used to prefix the area this navigator will look in with it's methods. (Defines the schema root)
      */
     public constructor(
         protected readonly schema: JsonSchema | JsonFormSchema | JsonTableSchema,
-        public propertyPrefix: string = '/',
-        public readonly schemaRootPrefix?: string
+        public readonly propertyPrefix: string = '/',
     ) {
         if (this.schema == null) {
             debug('[warn] tried to create navigable-schema with empty schema');
@@ -51,13 +59,8 @@ export class SchemaNavigator {
         // Fix the property prefix
         this.propertyPrefix = fixJsonPointerPath(propertyPrefix, true);
 
-        // Determine the schemaRootPrefix
-        if (this.schemaRootPrefix != null && this.schemaRootPrefix.length > 0) {
-            this.schemaRootPrefix = fixJsonPointerPath(propertyPrefix, true);
-        }
-        else {
-            this.schemaRootPrefix = this.guessSchemaRootPrefix();
-        }
+        // Determine the property definition root(s).
+        this.propertyDefinitionRoots = getApplicablePropertyDefinitions(this.schema, this.propertyPrefix);
 
         // Make sure this schema has an id set (otherwise we wont accept it)
         if (this.schemaId == null) {
@@ -148,7 +151,7 @@ export class SchemaNavigator {
      * @throws Error When the schema id and entity name are not set.
      */
     public get entity(): string | null {
-        return SchemaNavigator.getSchemaEntity(this.schema);
+        return getSchemaEntity(this.schema);
     }
 //endregion
 
@@ -554,33 +557,5 @@ export class SchemaNavigator {
                 }
             }
         }
-    }
-
-    /**
-     * Method to guess the schema root prefix.
-     */
-    private guessSchemaRootPrefix(): string {
-        var objectKey: string;
-
-        // Check if the schema itself is an array.
-        if (this.schema.type === 'array' && !!this.schema.items && _.isObject(this.schema.items) && (this.schema.items as JsonSchema).type === 'object') {
-            return '/items/';
-        }
-
-        // Check if one of the common collection wrappers is used (data or items) containing a single schema item.
-        else if (
-            this.schema.type === 'object' && !!this.schema.properties && _.isObject(this.schema.properties) && _.size(this.schema.properties) < 3 &&
-            !!(objectKey = _.findKey(this.schema.properties, (v, k) => k.toLowerCase() === 'data' || k.toLowerCase() === 'items'))
-        ) {
-            if (this.schema.properties[objectKey].type === 'array') {
-                return `/properties/${objectKey}/items/`;
-            }
-            else if(this.schema.properties[objectKey].type === 'object') {
-                return `/properties/${objectKey}/`;
-            }
-        }
-
-        // Just assume the root is ok.
-        return '/';
     }
 }

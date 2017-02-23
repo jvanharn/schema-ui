@@ -1,4 +1,5 @@
 import * as _ from 'lodash';
+import * as pointer from 'json-pointer';
 
 import { JsonSchema, CommonJsonSchema } from '../models/index';
 
@@ -44,19 +45,54 @@ export function convertSchemaIdToEntityName(id: string): string {
  *
  * @param schema The schema to give the paths for.
  * @param propertyPath The path to the property in the object that can be validated by the given schema.
- * @param propertyPathPrefix
  * @param schemaPathPrefix
  *
  * @return List of all schema paths that apply to the given property.
  */
 export function getApplicablePropertyDefinitions(
     schema: JsonSchema, propertyPath: string,
-    propertyPathPrefix: string = '/', schemaPathPrefix: string = '/'
+    schemaPathPrefix: string = '/'
 ): string[] {
-    let parts = propertyPath.split('/'),
-        schemaObj: JsonSchema,
-        schemaPath = schemaPathPrefix + '';
-    for (var part of parts) {
+    let cleaned = _.filter(propertyPath.split('/'), x => !_.isEmpty(x)),
+        current = _.first(cleaned),
+        isLast = cleaned.length <= 1;
 
+    if (current == null) {
+        return [fixJsonPointerPath(schemaPathPrefix)];
     }
+
+    if (schema.type === 'object') {
+        if (!!schema.properties && !!schema.properties[current]) {
+            return getApplicablePropertyDefinitions(
+                schema.properties[current],
+                '/' + cleaned.slice(1).join('/'),
+                schemaPathPrefix + '/properties/' + current);
+        }
+        if (!!schema.patternProperties) {
+            return _.flatMap(schema.properties, (sub, key) =>
+                getApplicablePropertyDefinitions(
+                    sub,
+                    '/' + cleaned.join('/'),
+                    schemaPathPrefix + '/patternProperties/' + key));
+        }
+    }
+    else if (schema.type === 'array') {
+        if (_.isObject(schema.items)) {
+            return getApplicablePropertyDefinitions(
+                schema.items,
+                '/' + cleaned.join('/'),
+                schemaPathPrefix + '/items');
+        }
+        var index = parseInt(current);
+        if (_.isArray(schema.items) && schema.items[index]) {
+            return getApplicablePropertyDefinitions(
+                schema.items[index],
+                '/' + cleaned.slice(1).join('/'),
+                schemaPathPrefix + '/items/' + index);
+        }
+    }
+
+    //@todo support anyOf, allOf, local-$ref-erences, ...
+
+    throw new Error(`Cannot find any way to navigate for path "${propertyPath}" and schema path "${schemaPathPrefix}"!`);
 }

@@ -19,7 +19,7 @@ import { CollectionFilterDescriptor } from '../cursors/filterable-cursor';
 import { CollectionSortDescriptor } from '../cursors/sortable-cursor';
 import { EndpointCursor } from '../cursors/endpoint-cursor';
 
-import { SchemaNavigator } from '../schema-navigator';
+import { SchemaNavigator } from '../navigator/schema-navigator';
 import { ISchemaValidator, AjvSchemaValidator } from '../validator/index';
 
 import * as urltemplate from 'url-template';
@@ -152,10 +152,18 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
             })
             .then(xhr => {
                 debug(`completed [${this.schema.root.id}].links.${link.rel}`);
+                var body: any = xhr.data,
+                    first: any;
+
+                // If the object only contains one item that is an object, just return that as the object.
+                if (_.isObject(xhr.data) && _.size(xhr.data as any) === 1 && _.isPlainObject(first = _.find(xhr.data as any, x => true))) {
+                    body = first;
+                }
+
                 return {
                     code: xhr.status,
                     headers: xhr.headers,
-                    body: xhr.data
+                    body: body
                 } as SchemaAgentResponse<TResponse>;
             })
             .catch((error: Error & { response: Axios.AxiosXHR<any> }) => {
