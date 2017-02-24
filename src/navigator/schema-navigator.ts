@@ -521,7 +521,7 @@ export class SchemaNavigator {
 
         _.each(obj, (val, key) =>
             this.propertyRootSchemaPointerMap[key.toLowerCase()] =
-                _.map(this.propertyDefinitionRoots, x => fixJsonPointerPath(x, true) + basePath + key));
+                _.map(this.propertyDefinitionRoots, x => fixJsonPointerPath(_.last(x.split('#'))) + fixJsonPointerPath(basePath, true) + key));
     }
 //endregion
 

@@ -48,7 +48,8 @@ export class AjvSchemaValidator implements ISchemaValidator {
                 loadSchema: (uri: string, cb: (err: Error, schema: Object) => any) =>
                     this.resolveMissingSchemaReference(uri)
                         .then(x => cb(null, x))
-                        .catch(e => cb(e, null))
+                        .catch(e => cb(e, null)),
+                inlineRefs: false
             } as ajv.Options, options));
 
         // this.validator.addKeyword('field', {
@@ -81,7 +82,11 @@ export class AjvSchemaValidator implements ISchemaValidator {
         //     } as JsonSchema
         // } as any);
 
-        this.ensureSchemaCompiled();
+        this.validator.compileAsync(this.schema.original, (err, validate) => {
+            if (err != null) {
+                debug(`[error] compilation failed of schema [${this.schema.schemaId}]: ${err.message}`);
+            }
+        });
     }
 
     /**
@@ -92,9 +97,7 @@ export class AjvSchemaValidator implements ISchemaValidator {
      * @return The result of the validation.
      */
     public validate<T>(item: T): Promise<ValidationResult> {
-        this.ensureSchemaCompiled();
-        return this.compiledSchema.then(validator =>
-            (validator(item, this.schema.propertyPrefix) as ajv.Thenable<boolean>).then(valid => this.mapValidationResult(valid, validator.errors)));
+        return Promise.resolve(this.mapValidationResult(this.validator.validate(this.schema.schemaId, item), this.validator.errors));
     }
 
     /**
@@ -109,9 +112,8 @@ export class AjvSchemaValidator implements ISchemaValidator {
         if (propertyName == null || propertyName.length <= 1) {
             return Promise.reject(new Error(`Invalid property name given "${propertyName}"`));
         }
-        this.ensureSchemaCompiled();
-        return this.compiledSchema.then(validator =>
-            (validator(value, this.schema.getPropertyPointer(propertyName)) as ajv.Thenable<boolean>).then(valid => this.mapValidationResult(valid, validator.errors)));
+        return Promise.resolve(this.mapValidationResult(
+            this.validator.validate(this.schema.fields[propertyName], value), this.validator.errors));
     }
 
     /**
@@ -139,22 +141,6 @@ export class AjvSchemaValidator implements ISchemaValidator {
                 path: e.dataPath
             } as ValidationError))
         } as ValidationResult;
-    }
-
-    /**
-     * Makes sure the schema is compiled JIT.
-     */
-    protected ensureSchemaCompiled(): void {
-        if (!this.compiledSchema) {
-            this.compiledSchema = new Promise((resolve, reject) =>
-                this.validator.compileAsync(this.schema.original, (err, validate) => {
-                    if (err != null) {
-                        debug(`compilation failed of schema [${this.schema.schemaId}]: ${err.message}`);
-                        return reject(err);
-                    }
-                    resolve(validate);
-                }));
-        }
     }
 
     /**

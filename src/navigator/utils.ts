@@ -16,17 +16,11 @@ export function fixJsonPointerPath(path: string, leadingSlash: boolean = false):
         return url + '#' + fixJsonPointerPath(path, leadingSlash);
     }
 
-    if (path[0] !== '/' && path[0] !== '$') {
-        path = '/' + path;
+    var parts = _.filter(path.split('/'), x => !_.isEmpty(x));
+    if (parts.length === 0) {
+        return leadingSlash ? '/' : '';
     }
-
-    if (!leadingSlash && path.length > 1 && path[path.length - 1] === '/') {
-        return path.substring(0, path.length - 1);
-    }
-    else if (!!leadingSlash && path.length > 1 && path[path.length - 1] !== '/') {
-        return path + '/';
-    }
-    return path;
+    return '/' + parts.join('/') + (leadingSlash ? '/' : '');
 }
 
 /**
