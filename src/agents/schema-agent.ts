@@ -10,7 +10,7 @@ import {
     IdentityValues,
     EntityIdentity
 } from '../models/index';
-import { SchemaNavigator } from '../schema-navigator';
+import { SchemaNavigator } from '../navigator/schema-navigator';
 import { ICursor } from '../cursors/cursor';
 import { CollectionFilterDescriptor } from '../cursors/filterable-cursor';
 import { CollectionSortDescriptor } from '../cursors/sortable-cursor';

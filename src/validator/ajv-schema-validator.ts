@@ -94,7 +94,7 @@ export class AjvSchemaValidator implements ISchemaValidator {
     public validate<T>(item: T): Promise<ValidationResult> {
         this.ensureSchemaCompiled();
         return this.compiledSchema.then(validator =>
-            (validator(item) as ajv.Thenable<boolean>).then(valid => this.mapValidationResult(valid, validator.errors)));
+            (validator(item, this.schema.propertyPrefix) as ajv.Thenable<boolean>).then(valid => this.mapValidationResult(valid, validator.errors)));
     }
 
     /**
@@ -147,7 +147,7 @@ export class AjvSchemaValidator implements ISchemaValidator {
     protected ensureSchemaCompiled(): void {
         if (!this.compiledSchema) {
             this.compiledSchema = new Promise((resolve, reject) =>
-                this.validator.compileAsync(this.schema.root, (err, validate) => {
+                this.validator.compileAsync(this.schema.original, (err, validate) => {
                     if (err != null) {
                         debug(`compilation failed of schema [${this.schema.schemaId}]: ${err.message}`);
                         return reject(err);

@@ -4,7 +4,7 @@ import { CollectionSortDescriptor, SortingDirection, inverseSortMode } from './s
 import { IColumnizedCursor } from './columnized-cursor';
 import { SchemaColumnDescriptor } from '../models/table';
 import { ISearchableCursor } from './searchable-cursor';
-import { SchemaNavigator } from '../schema-navigator';
+import { SchemaNavigator } from '../navigator/schema-navigator';
 
 import { EventEmitter } from 'eventemitter3';
 import * as pointer from 'json-pointer';

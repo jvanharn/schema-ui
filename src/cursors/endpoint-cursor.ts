@@ -1,7 +1,7 @@
 import { ICursor, CursorLoadingState, PageChangeEvent, getAllCursorPages } from './cursor';
 import { ISearchableCursor } from './searchable-cursor';
 
-import { SchemaNavigator } from '../schema-navigator';
+import { SchemaNavigator } from '../navigator/schema-navigator';
 
 import { SchemaHyperlinkDescriptor, IdentityValues } from '../models/index';
 

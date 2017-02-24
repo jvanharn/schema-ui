@@ -7,11 +7,24 @@ import { JsonSchema, CommonJsonSchema } from '../models/index';
  * Fixes common mistakes in JsonPointers.
  */
 export function fixJsonPointerPath(path: string, leadingSlash: boolean = false): string {
+    if (path == null) {
+        return leadingSlash ? '/' : '';
+    }
+
+    if (path.substr(0, 4) === 'http') {
+        var [url, path] = path.split('#');
+        return url + '#' + fixJsonPointerPath(path, leadingSlash);
+    }
+
     if (path[0] !== '/' && path[0] !== '$') {
         path = '/' + path;
     }
+
     if (!leadingSlash && path.length > 1 && path[path.length - 1] === '/') {
         return path.substring(0, path.length - 1);
+    }
+    else if (!!leadingSlash && path.length > 1 && path[path.length - 1] !== '/') {
+        return path + '/';
     }
     return path;
 }
@@ -47,12 +60,18 @@ export function convertSchemaIdToEntityName(id: string): string {
  * @param propertyPath The path to the property in the object that can be validated by the given schema.
  * @param schemaPathPrefix
  *
- * @return List of all schema paths that apply to the given property.
+ * @return List of all schema-relative paths that apply to the given property.
  */
-export function getApplicablePropertyDefinitions(
-    schema: JsonSchema, propertyPath: string,
-    schemaPathPrefix: string = '/'
-): string[] {
+export function getApplicablePropertyDefinitions(schema: JsonSchema, propertyPath: string, referenceResolver?: (ref: string) => JsonSchema, schemaPathPrefix?: string): string[] {
+    if (schemaPathPrefix == null) {
+        if (String(schema.id).lastIndexOf('#') >= 0) {
+            schemaPathPrefix = schema.id + '';
+        }
+        else {
+            schemaPathPrefix = schema.id + '#';
+        }
+    }
+
     let cleaned = _.filter(propertyPath.split('/'), x => !_.isEmpty(x)),
         current = _.first(cleaned),
         isLast = cleaned.length <= 1;
@@ -61,18 +80,28 @@ export function getApplicablePropertyDefinitions(
         return [fixJsonPointerPath(schemaPathPrefix)];
     }
 
+    if (schema.$ref != null) {
+        schema = !!referenceResolver ? referenceResolver(schema.$ref) : null;
+        if (schema == null || _.isEmpty(schema)) {
+            throw new Error(`Encountered reference that could not resolved: [${schema.$ref}]`);
+        }
+        return getApplicablePropertyDefinitions(schema, '/' + cleaned.join('/'), referenceResolver);
+    }
+
     if (schema.type === 'object') {
         if (!!schema.properties && !!schema.properties[current]) {
             return getApplicablePropertyDefinitions(
                 schema.properties[current],
                 '/' + cleaned.slice(1).join('/'),
+                referenceResolver,
                 schemaPathPrefix + '/properties/' + current);
         }
         if (!!schema.patternProperties) {
-            return _.flatMap(schema.properties, (sub, key) =>
+            return _.flatMap(schema.patternProperties, (sub, key) =>
                 getApplicablePropertyDefinitions(
                     sub,
-                    '/' + cleaned.join('/'),
+                    '/' + cleaned.slice(1).join('/'),
+                    referenceResolver,
                     schemaPathPrefix + '/patternProperties/' + key));
         }
     }
@@ -80,7 +109,8 @@ export function getApplicablePropertyDefinitions(
         if (_.isObject(schema.items)) {
             return getApplicablePropertyDefinitions(
                 schema.items,
-                '/' + cleaned.join('/'),
+                '/' + cleaned.slice(1).join('/'),
+                referenceResolver,
                 schemaPathPrefix + '/items');
         }
         var index = parseInt(current);
@@ -88,6 +118,7 @@ export function getApplicablePropertyDefinitions(
             return getApplicablePropertyDefinitions(
                 schema.items[index],
                 '/' + cleaned.slice(1).join('/'),
+                referenceResolver,
                 schemaPathPrefix + '/items/' + index);
         }
     }

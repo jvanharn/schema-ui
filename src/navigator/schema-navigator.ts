@@ -35,7 +35,7 @@ export class SchemaNavigator {
     /**
      * Cache where a list of propertyRoot properties is mapped to their schema json pointers.
      */
-    protected propertyRootSchemaPointerMap: { [property: string]: string };
+    protected propertyRootSchemaPointerMap: { [property: string]: string[] };
 
     /**
      * A list of all the definitions that apply to the given propertyPrefix.
@@ -60,7 +60,7 @@ export class SchemaNavigator {
         this.propertyPrefix = fixJsonPointerPath(propertyPrefix, true);
 
         // Determine the property definition root(s).
-        this.propertyDefinitionRoots = getApplicablePropertyDefinitions(this.schema, this.propertyPrefix);
+        this.propertyDefinitionRoots = getApplicablePropertyDefinitions(this.schema, this.propertyPrefix, ref => this.getEmbeddedSchema(ref));
 
         // Make sure this schema has an id set (otherwise we wont accept it)
         if (this.schemaId == null) {
@@ -82,312 +82,365 @@ export class SchemaNavigator {
         return this.schema;
     }
 
-    /**
-     * Document identity property.
-     *
-     * The "highest rated" identity property in the document. If none is found, just gives the first property in the document.
-     */
-    public get identityProperty(): string {
-        let fields = this.propertyRoot,
-            name: string,
-            current: number;
+    //region get/set root
+        /**
+         * The actual schema as calculated.
+         */
+        private _root: JsonSchema;
 
-        for (var key in fields) {
-            var score = this.isIdentityProperty(key);
-            if (!name) {
-                name = key;
-                current = Math.min(score, 3);
+        /**
+         * Finds the root property that contains one or more identity properties, or contains fields.
+         *
+         * Usefull for schemas that are embedded in sub-properties like "item", "items", "{entity}" or ones that also emit meta data at the root level.
+         */
+        public get root(): JsonSchema | JsonFormSchema | JsonTableSchema {
+            if (!this._root) {
+                this._root = _.assign.apply(_, _.map(this.propertyDefinitionRoots, x => {
+                    try {
+                        var [url, path] = x.split('#');
+                        var schema = this.getEmbeddedSchema(url);
+                        if (!schema) {
+                            throw new Error(`Unable to find the schema id ${url}.`);
+                        }
+
+                        if (path == null || path === '/' || path === '') {
+                            return schema;
+                        }
+
+                        let sub = pointer.get(schema, path);
+                        if (!!sub && sub.$ref != null) {
+                            sub = this.getEmbeddedSchema(sub.$ref);
+                        }
+
+                        if (!_.isObject(sub) || _.isEmpty(sub)) {
+                            throw new Error('The property root contained a $ref that pointed to a non-existing(at least not embedded) schema!');
+                        }
+
+                        return sub;
+                    }
+                    catch (e) {
+                        debug(`[warn] unable to fetch the root on path "${x}":`, e);
+                        return { };
+                    }
+                }));
+
+                if (!_.isObject(this._root) || _.isEmpty(this._root)) {
+                    throw new Error('Unable to determine the correct property root!');
+                }
             }
-            else if (fields.hasOwnProperty(key) && score > 0 && score < current) {
+
+            return this._root;
+        }
+    //endregion
+
+    //region Identity-properties
+        /**
+         * The property used to cache the identity once calculated.
+         */
+        private _identityProperty: string;
+
+        /**
+         * Document identity property.
+         *
+         * The "highest rated" identity property in the document. If none is found, just gives the first property in the document.
+         */
+        public get identityProperty(): string {
+            if (!!this._identityProperty) {
+                return this._identityProperty;
+            }
+
+            let fields = this.propertyRoot,
+                name: string,
+                current: number;
+
+            for (var key in fields) {
+                var score = this.isIdentityProperty(key);
+
+                if (!name) {
+                    name = key;
+                    current = Math.min(score, 3);
+                }
+                else if (fields.hasOwnProperty(key) && score > 0 && score < current) {
+                    name = key;
+                    current = score;
+                }
+
                 if (score === 1) {
                     return key;
                 }
-                name = key;
-                current = score;
             }
+
+            return this._identityProperty = name;
         }
 
-        return name;
-    }
-
-    /**
-     * Get's a list of all identity-like properties in the document. (Not only the main one)
-     */
-    public get identityProperties(): string[] {
-        let props = this.propertyRoot,
-            identities: string[] = [];
-        for (let key in props) {
-            if (props.hasOwnProperty(key) && this.isIdentityProperty(key) > 0) {
-                identities.push(key);
-            }
-        }
-        return identities;
-    }
-
-    /**
-     * Finds the root property that contains one or more identity properties, or contains fields.
-     *
-     * Usefull for schemas that are embedded in sub-properties like "item", "items", "{entity}" or ones that also emit meta data at the root level.
-     */
-    public get root(): JsonSchema | JsonFormSchema | JsonTableSchema {
-        if (this.schemaRootPrefix === '/' || this.schemaRootPrefix.length <= 1) {
-            return this.schema;
-        }
-
-        try {
-            return pointer.get(this.schema, this.schemaRootPrefix);
-        }
-        catch (e) {
-            debug('error when retrieving root', e);
-            return this.schema;
-        }
-    }
-
-//region CommonJsonSchema Helpers
-    /**
-     * The name of the entity that this schema describes.
-     *
-     * When not set, the entity name is guessed based on the schema id.
-     * @throws Error When the schema id and entity name are not set.
-     */
-    public get entity(): string | null {
-        return getSchemaEntity(this.schema);
-    }
-//endregion
-
-//region JsonFormSchema Helpers
-    /**
-     * Property containing the cached pattern property root.
-     */
-    private _patternPropertyRootCache: SchemaPropertyMap<JsonSchema>;
-
-    /**
-     * Property containing the cached pattern property root.
-     */
-    private _patternRequiredPropertyCache: string[];
-
-    /**
-     * Builds the cache of (required) pattern properties
-     */
-    private _buildPatternPropertyCache(): void {
-        // begin with any regular properties, if they are set
-        if (_.isPlainObject(this.root.properties) && _.size(this.root.properties) > 0) {
-            this._patternPropertyRootCache = _.assign({}, this.root.properties) as SchemaPropertyMap<JsonSchema>;
-
-            this.createPropertyRootCache(
-                fixJsonPointerPath((this.schemaRootPrefix || '/') + 'properties', true),
-                this.root.properties);
-        }
-        else {
-            this._patternPropertyRootCache = { };
-        }
-        this._patternRequiredPropertyCache = [];
-
-        var parts = this.propertyPrefix.split('/'),
-            matchable = !!parts && !!parts[1] ? String(parts[1]) : '';
-        if (matchable.length === 0) {
-            debug(`[warn] propertyRoot is matching on an empty first property root path (${this.propertyPrefix}), so this will probably cause unexpected behaviour.`);
-        }
-
-        _.each(this.root.patternProperties, (schema: JsonSchema, pattern: string) => {
-            if (matchable.search(pattern) >= 0) {
-                this._patternPropertyRootCache = _.assign(this._patternPropertyRootCache, schema.properties) as SchemaPropertyMap<JsonSchema>;
-
-                this.createPropertyRootCache(
-                    fixJsonPointerPath((this.schemaRootPrefix || '/') + `patternProperties/${pattern}/properties`, true),
-                    schema.properties);
-
-                if (_.isArray(schema.required)) {
-                    this._patternRequiredPropertyCache.push(...schema.required);
+        /**
+         * Get's a list of all identity-like properties in the document. (Not only the main one)
+         */
+        public get identityProperties(): string[] {
+            let props = this.propertyRoot,
+                identities: string[] = [];
+            for (let key in props) {
+                if (props.hasOwnProperty(key) && this.isIdentityProperty(key) > 0) {
+                    identities.push(key);
                 }
             }
-        });
-    }
+            return identities;
+        }
+    //endregion
 
-    /**
-     * Get all schema properties.
-     *
-     * @return Dictionary of property names and their JsonSchemas.
-     */
-    public get propertyRoot(): SchemaPropertyMap<JsonSchema> {
-        if (this.hasPatternProperties()) {
-            if (this._patternPropertyRootCache == null) {
-                this._buildPatternPropertyCache();
+    //region CommonJsonSchema Helpers
+        /**
+         * The name of the entity that this schema describes.
+         *
+         * When not set, the entity name is guessed based on the schema id.
+         * @throws Error When the schema id and entity name are not set.
+         */
+        public get entity(): string | null {
+            return getSchemaEntity(this.schema);
+        }
+    //endregion
+
+    //region JsonFormSchema Helpers
+        /**
+         * Property containing the cached pattern property root.
+         */
+        private _patternRequiredPropertyCache: string[];
+
+        /**
+         * The cache for the proeprty root.
+         */
+        private _propertyRoot: SchemaPropertyMap<JsonSchema>;
+
+        /**
+         * Get all schema properties.
+         *
+         * @return Dictionary of property names and their JsonSchemas.
+         */
+        public get propertyRoot(): SchemaPropertyMap<JsonSchema> {
+            if (!!this._propertyRoot) {
+                return this._propertyRoot;
             }
 
-            return this._patternPropertyRootCache;
+            return this._propertyRoot = this.findPropertiesMap(this.root);
         }
-        else if (this.schema.type === 'object') {
-            if (!this.propertyRootSchemaPointerMap) {
-                this.createPropertyRootCache(
-                    fixJsonPointerPath((this.schemaRootPrefix || '/') + 'properties', true),
-                    this.root.properties);
+
+        /**
+         * Takes an schema and finds the schema properties object.
+         */
+        protected findPropertiesMap(schema: JsonSchema, schemaPathPrefix: string = ''): SchemaPropertyMap<JsonSchema> {
+            if (this.hasPatternProperties(schema)) {
+                return this.findPatternPropertiesMap(schema, schemaPathPrefix);
             }
+            else if (schema.type === 'object') {
+                if (!this.propertyRootSchemaPointerMap) {
+                    this.createPropertyRootCache(schemaPathPrefix + 'properties', schema.properties);
+                }
 
-            return this.root.properties;
-        }
-        else if (this.schema.type === 'array' && !_.isArray(this.root.items as JsonSchema)) {
-            if (!this.propertyRootSchemaPointerMap) {
-                this.createPropertyRootCache(
-                    fixJsonPointerPath((this.schemaRootPrefix || '/') + 'items/properties', true),
-                    this.root.properties);
+                return schema.properties;
             }
+            // @warn this does not work, because the path prefix should already include an array-index in order to make this work.
+            // @warn if we enable this, it is complete guess work what array index we are working with.
+            // @warn if anyone ever demands this feature you would have to refactor this method to also add the "/0" index to the getPropertyPointer function.
+            // else if (schema.type === 'array' && !_.isArray(schema.items as JsonSchema)) {
+            //     if ((schema.items as JsonSchema).$ref != null) {
+            //         return this.findPropertiesMap(this.getEmbeddedSchema((schema.items as JsonSchema).$ref), schemaPathPrefix + 'items/');
+            //     }
 
-            return (this.root.items as JsonSchema).properties;
-        }
-        else {
-            return { };
-        }
-    }
-
-    /**
-     * Check whether or not this is a form schema.
-     *
-     * An schema can be both a collection/table and a form.
-     */
-    public isForm(): boolean {
-        return !_.isEmpty(this.propertyRoot);
-    }
-
-    /**
-     * Finds the main form property list and returns the ones that qualify as visible fields.
-     *
-     * @return An dictionary of all visible fields in thi JsonFormSchema.
-     */
-    public get fields(): SchemaPropertyMap<JsonFormSchema> {
-        let props = this.propertyRoot,
-            fields: SchemaPropertyMap<JsonFormSchema> = { };
-        for (let key in props) {
-            if (!props.hasOwnProperty(key)) {
-                continue;
-            }
-
-            let item = (props[key] as JsonFormSchema).field;
-            if (!!item && (item.visible === true || (item.type != null && item.visible !== false))) {
-                fields[key] = props[key] as JsonFormSchema;
+            //     return this.findPropertiesMap(schema.items as JsonSchema, schemaPathPrefix + 'items/');
+            // }
+            else {
+                return { };
             }
         }
-        return fields;
-    }
 
-    /**
-     * Check whether the field in this schema root is required.
-     *
-     * @param name The name of the field to check. Has to be returned by the fields property.
-     *
-     * @return Whether or not the given field is required.
-     */
-    public isFieldRequired(name: string): boolean {
-        if (this.hasPatternProperties()) {
-            if (this._patternRequiredPropertyCache == null) {
-                this._buildPatternPropertyCache();
+        /**
+         * Builds the cache of (required) pattern properties
+         */
+        private findPatternPropertiesMap(schema: JsonSchema, schemaPathPrefix: string = ''): SchemaPropertyMap<JsonSchema> {
+            var properties = { };
+
+            // begin with any regular properties, if they are set
+            if (_.isPlainObject(schema.properties) && _.size(schema.properties) > 0) {
+                properties = _.assign({}, schema.properties) as SchemaPropertyMap<JsonSchema>;
+
+                this.createPropertyRootCache(schemaPathPrefix + 'properties', schema.properties);
+            }
+            this._patternRequiredPropertyCache = [];
+
+            var parts = this.propertyPrefix.split('/'),
+                matchable = !!parts && !!parts[1] ? String(parts[1]) : '';
+            if (matchable.length === 0) {
+                debug(`[warn] propertyRoot is matching on an empty first property root path (${this.propertyPrefix}), so this will probably cause unexpected behaviour.`);
             }
 
-            return _.includes(this._patternRequiredPropertyCache, name);
-        }
-        else if (this.schema.type === 'object') {
-            return _.includes(this.root.required, name);
-        }
-        else if (this.schema.type) {
-            return _.includes((this.root.items as JsonSchema).required, name);
-        }
-        return false;
-    }
-//endregion
+            _.each(schema.patternProperties, (schema: JsonSchema, pattern: string) => {
+                if (matchable.search(pattern) >= 0) {
+                    properties = _.assign(properties, schema.properties) as SchemaPropertyMap<JsonSchema>;
 
-//region JsonTableSchema Helpers
-    /**
-     * Check whether or not this schema is a schema for a paginated collection (e.g. a JsonTableSchema).
-     *
-     * An schema can be both a collection/table and a form.
-     */
-    public isCollection(): boolean {
-        return !!(this.schema as JsonTableSchema).columns && _.isArray((this.schema as JsonTableSchema).columns);
-    }
+                    this.createPropertyRootCache(schemaPathPrefix + `patternProperties/${pattern}/properties`, schema.properties);
 
-    /**
-     * Get the list of columns associated with this schema.
-     */
-    public get columns(): SchemaColumnDescriptor[] {
-        return _.isArray((this.schema as JsonTableSchema).columns)
-            ? (this.schema as JsonTableSchema).columns
-            : new Array;
-    }
-//endregion
+                    if (_.isArray(schema.required)) {
+                        this._patternRequiredPropertyCache.push(...schema.required);
+                    }
+                }
+            });
 
-//region Json Hyperschema Helpers
-    /**
-     * Get all schema hyperlinks.
-     */
-    public get links(): SchemaHyperlinkDescriptor[] {
-        return _.isArray(this.schema.links)
-            ? this.schema.links
-            : new Array;
-    }
-
-    /**
-     * Get a schema hyper(media)link by the relation type.
-     *
-     * @link https://tools.ietf.org/html/rfc5988#section-6.2.2 See this page for official 'rel' value names.
-     *
-     * @param rel Name or 'relation' of the hyperlink OR index of the hyperlink.
-     *
-     * @return The hyperlink descriptor object.
-     */
-    public getLink(rel: string | number): SchemaHyperlinkDescriptor {
-        if (_.isString(rel)) {
-            return _.find(this.links, x => x.rel === rel);
+            return properties;
         }
-        else if (_.isNumber(rel)) {
-            return this.links[rel];
-        }
-        debug('link requested with invalid "rel" type');
-        return null;
-    }
 
-    /**
-     * Check whether a schema hyper(media)link by the given relation type exists.
-     *
-     * @link https://tools.ietf.org/html/rfc5988#section-6.2.2 See this page for official 'rel' value names.
-     *
-     * @param rel Name or 'relation' of the hyperlink or index of the hyperlink.
-     *
-     * @return Whether or not the given link exists on this schema.
-     */
-    public hasLink(rel: string | number): boolean {
-        if (_.isString(rel)) {
-            return _.some(this.links, x => x.rel === rel);
+        /**
+         * Check whether or not this is a form schema.
+         *
+         * An schema can be both a collection/table and a form.
+         */
+        public isForm(): boolean {
+            return !_.isEmpty(this.propertyRoot);
         }
-        else if (_.isNumber(rel)) {
-            return !!this.links[rel];
-        }
-        debug('link existence asked with invalid "rel" type');
-        return null;
-    }
 
+        /**
+         * Finds the main form property list and returns the ones that qualify as visible fields.
+         *
+         * @return An dictionary of all visible fields in thi JsonFormSchema.
+         */
+        public get fields(): SchemaPropertyMap<JsonFormSchema> {
+            let props = this.propertyRoot,
+                fields: SchemaPropertyMap<JsonFormSchema> = { };
+            for (let key in props) {
+                if (!props.hasOwnProperty(key)) {
+                    continue;
+                }
 
-    /**
-     * Get a schema hyper(media)link by a ordered list of relation types.
-     *
-     * This method will first look for the first link, if it doesnt find it, the next, etc untill it finds one or no relation names are left.
-     *
-     * @link https://tools.ietf.org/html/rfc5988#section-6.2.2 See this page for official 'rel' value names.
-     *
-     * @param rels Relation names that should be searched for, in search order.
-     *
-     * @return The hyperlink descriptor object.
-     */
-    public getFirstLink(rels: string[]): SchemaHyperlinkDescriptor {
-        let result: SchemaHyperlinkDescriptor
-        for (let rel of rels) {
-            result = this.getLink(rel);
-            if (result != null) {
-                break;
+                let item = (props[key] as JsonFormSchema).field;
+                if (!!item && (item.visible === true || (item.type != null && item.visible !== false))) {
+                    fields[key] = props[key] as JsonFormSchema;
+                }
             }
+            return fields;
         }
-        return result;
-    }
-//endregion
+
+        /**
+         * Check whether the field in this schema root is required.
+         *
+         * @param name The name of the field to check. Has to be returned by the fields property.
+         *
+         * @return Whether or not the given field is required.
+         */
+        public isFieldRequired(name: string): boolean {
+            if (this.hasPatternProperties()) {
+                if (this._patternRequiredPropertyCache == null) {
+                    this.propertyRoot;
+                }
+
+                return _.includes(this._patternRequiredPropertyCache, name);
+            }
+            else if (this.schema.type === 'object') {
+                return _.includes(this.root.required, name);
+            }
+            else if (this.schema.type) {
+                return _.includes((this.root.items as JsonSchema).required, name);
+            }
+            return false;
+        }
+    //endregion
+
+    //region JsonTableSchema Helpers
+        /**
+         * Check whether or not this schema is a schema for a paginated collection (e.g. a JsonTableSchema).
+         *
+         * An schema can be both a collection/table and a form.
+         */
+        public isCollection(): boolean {
+            return !!(this.schema as JsonTableSchema).columns && _.isArray((this.schema as JsonTableSchema).columns);
+        }
+
+        /**
+         * Get the list of columns associated with this schema.
+         */
+        public get columns(): SchemaColumnDescriptor[] {
+            return _.isArray((this.schema as JsonTableSchema).columns)
+                ? (this.schema as JsonTableSchema).columns
+                : new Array;
+        }
+    //endregion
+
+    //region Json Hyperschema Helpers
+        /**
+         * Get all schema hyperlinks.
+         */
+        public get links(): SchemaHyperlinkDescriptor[] {
+            var lnk: any[] = [];
+            if (_.isArray(this.root.links)) {
+                lnk = lnk.concat(this.root.links);
+            }
+            if (_.isArray(this.schema.links)) {
+                lnk = lnk.concat(this.schema.links);
+            }
+            return lnk;
+        }
+
+        /**
+         * Get a schema hyper(media)link by the relation type.
+         *
+         * @link https://tools.ietf.org/html/rfc5988#section-6.2.2 See this page for official 'rel' value names.
+         *
+         * @param rel Name or 'relation' of the hyperlink OR index of the hyperlink.
+         *
+         * @return The hyperlink descriptor object.
+         */
+        public getLink(rel: string | number): SchemaHyperlinkDescriptor {
+            if (_.isString(rel)) {
+                return _.find(this.links, x => x.rel === rel);
+            }
+            else if (_.isNumber(rel)) {
+                return this.links[rel];
+            }
+            debug('link requested with invalid "rel" type');
+            return null;
+        }
+
+        /**
+         * Check whether a schema hyper(media)link by the given relation type exists.
+         *
+         * @link https://tools.ietf.org/html/rfc5988#section-6.2.2 See this page for official 'rel' value names.
+         *
+         * @param rel Name or 'relation' of the hyperlink or index of the hyperlink.
+         *
+         * @return Whether or not the given link exists on this schema.
+         */
+        public hasLink(rel: string | number): boolean {
+            if (_.isString(rel)) {
+                return _.some(this.links, x => x.rel === rel);
+            }
+            else if (_.isNumber(rel)) {
+                return !!this.links[rel];
+            }
+            debug('link existence asked with invalid "rel" type');
+            return null;
+        }
+
+
+        /**
+         * Get a schema hyper(media)link by a ordered list of relation types.
+         *
+         * This method will first look for the first link, if it doesnt find it, the next, etc untill it finds one or no relation names are left.
+         *
+         * @link https://tools.ietf.org/html/rfc5988#section-6.2.2 See this page for official 'rel' value names.
+         *
+         * @param rels Relation names that should be searched for, in search order.
+         *
+         * @return The hyperlink descriptor object.
+         */
+        public getFirstLink(rels: string[]): SchemaHyperlinkDescriptor {
+            let result: SchemaHyperlinkDescriptor
+            for (let rel of rels) {
+                result = this.getLink(rel);
+                if (result != null) {
+                    break;
+                }
+            }
+            return result;
+        }
+    //endregion
 
 //region JSON-Pointer helpers
     /**
@@ -420,15 +473,15 @@ export class SchemaNavigator {
     }
 
     /**
-     * Get the property schema pointer.
+     * Get the property schema pointers.
      *
      * Get the JSON Pointer pointing to the given field property schema/descriptor in this schema
      *
      * @param name The name of the property to get the pointer to.
      *
-     * @return The pointer to the given property schema.
+     * @return The pointers to the given property schema.
      */
-    public getPropertySchemaPointer(name: string): string {
+    public getPropertySchemaPointer(name: string): string[] {
         return this.propertyRootSchemaPointerMap[String(name).toLowerCase()];
     }
 
@@ -466,17 +519,17 @@ export class SchemaNavigator {
             this.propertyRootSchemaPointerMap = { };
         }
 
-        _.each(obj, (val, key) => {
-            this.propertyRootSchemaPointerMap[key.toLowerCase()] = basePath + key;
-        });
+        _.each(obj, (val, key) =>
+            this.propertyRootSchemaPointerMap[key.toLowerCase()] =
+                _.map(this.propertyDefinitionRoots, x => fixJsonPointerPath(x, true) + basePath + key));
     }
 //endregion
 
     /**
      * Whether or not the schema has patterned properties in it's root.
      */
-    public hasPatternProperties(): boolean {
-        return (!!this.root.patternProperties && _.size(this.root.patternProperties) > 0);
+    public hasPatternProperties(schema: JsonSchema = this.root): boolean {
+        return (!!schema.patternProperties && _.size(schema.patternProperties) > 0);
     }
 
     /**
@@ -514,6 +567,14 @@ export class SchemaNavigator {
             return pointer.get(this.schema, fixJsonPointerPath(schemaId.substr(1)));
         }
 
+        if (!_.includes(schemaId, '#')) {
+            schemaId += '#';
+        }
+
+        if (schemaId == this.schema.id) {
+            return this.schema;
+        }
+
         let sp = this.getSchemaIdsWithPointers()[schemaId];
         if (sp == null || sp === '') {
             debug(`requested embedded schema with id ${schemaId}, but could not find it`);
@@ -529,8 +590,13 @@ export class SchemaNavigator {
      * @return The priority of the given property as an identifying property. 0 = Not an identity, 1 = Primary identity (Numeric: ID, Id, UId, {SchemaName}Id, ...), 2 = Secondary identity (ItemId, ItemUId, ...), 3 = Composite Primary identity (String/Numeric, name, ...)
      */
     protected isIdentityProperty(name: string): 1 | 2 | 3 | 0 {
-        let lower = name.toLocaleLowerCase();
-        if (lower === 'id' || lower === 'uid' || lower === 'guid' || lower === `${this.entity.toLocaleLowerCase()}id`) {
+        let lower = name.toLocaleLowerCase(),
+            entity = this.entity.toLocaleLowerCase();
+        if (
+            lower === 'id' || lower === 'uid' || lower === 'guid' ||
+            lower === `${entity}id` || lower === `${entity}uid` ||
+            lower === entity
+        ) {
             return 1;
         }
         else if (lower.indexOf('id') >= 0 || lower.indexOf('uid') >= 0 || lower.indexOf('guid') >= 0) {

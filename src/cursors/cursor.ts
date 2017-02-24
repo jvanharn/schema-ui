@@ -1,5 +1,5 @@
 import { JsonSchema } from '../models/schema';
-import { SchemaNavigator } from '../schema-navigator';
+import { SchemaNavigator } from '../navigator/schema-navigator';
 import { EventEmitter } from 'eventemitter3';
 
 import * as _ from 'lodash';
