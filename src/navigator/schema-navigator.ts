@@ -456,6 +456,17 @@ export class SchemaNavigator {
     }
 
     /**
+     * Set property or field value.
+     *
+     * @param name The name of the property to set.
+     * @param data The data object to set the property on.
+     * @param value The value of the property.
+     */
+    public setPropertyValue(name: string, data: any, value: any): void {
+        pointer.set(data, this.getPropertyPointer(name), value);
+    }
+
+    /**
      * Get the property data pointer.
      *
      * Get the JSON Pointer pointing to the given field property value in the data object described by this schema.

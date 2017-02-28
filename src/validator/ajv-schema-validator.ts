@@ -97,7 +97,12 @@ export class AjvSchemaValidator implements ISchemaValidator {
      * @return The result of the validation.
      */
     public validate<T>(item: T): Promise<ValidationResult> {
-        return Promise.resolve(this.mapValidationResult(this.validator.validate(this.schema.schemaId, item), this.validator.errors));
+        try {
+            return Promise.resolve(this.mapValidationResult(this.validator.validate(this.schema.schemaId, item), this.validator.errors));
+        }
+        catch (e) {
+            return Promise.reject(e);
+        }
     }
 
     /**
@@ -112,8 +117,14 @@ export class AjvSchemaValidator implements ISchemaValidator {
         if (propertyName == null || propertyName.length <= 1) {
             return Promise.reject(new Error(`Invalid property name given "${propertyName}"`));
         }
-        return Promise.resolve(this.mapValidationResult(
-            this.validator.validate(this.schema.fields[propertyName], value), this.validator.errors));
+
+        try {
+            return Promise.resolve(this.mapValidationResult(
+                this.validator.validate(this.schema.fields[propertyName], value), this.validator.errors));
+        }
+        catch (e) {
+            return Promise.reject(e);
+        }
     }
 
     /**

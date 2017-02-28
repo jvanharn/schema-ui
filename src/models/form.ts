@@ -4,7 +4,6 @@ import { CommonJsonSchema } from './common';
  * Json Schema with Form extensions.
  */
 export interface JsonFormSchema extends CommonJsonSchema {
-
     /**
      * Information describing a field
      */
