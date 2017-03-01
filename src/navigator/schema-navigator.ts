@@ -196,7 +196,7 @@ export class SchemaNavigator {
          * @throws Error When the schema id and entity name are not set.
          */
         public get entity(): string | null {
-            return getSchemaEntity(this.schema);
+            return getSchemaEntity(this.root) || getSchemaEntity(this.schema);
         }
     //endregion
 

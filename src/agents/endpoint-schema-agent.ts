@@ -221,7 +221,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
         }
 
         // Execute the request
-        return this.execute<T, any>(link, void 0, urlData).then(response => this.schema.getIdentityValue(response.body));
+        return this.execute<T, any>(link, item, urlData).then(response => this.schema.getIdentityValue(response.body));
     }
 
     /**
