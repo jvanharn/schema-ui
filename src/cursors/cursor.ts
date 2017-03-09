@@ -117,6 +117,12 @@ export interface ICursor<T> extends EventEmitter {
      */
     on(ev: 'afterPageChange', fn: (event: PageChangeEvent<T>) => void, ctx?: any): this;
     once(ev: 'afterPageChange', fn: (event: PageChangeEvent<T>) => void, ctx?: any): this;
+
+    /**
+     * Event fired when an error ocurs whilst fetching a page.
+     */
+    on(ev: 'error', fn: (event: Error) => void, ctx?: any): this;
+    once(ev: 'error', fn: (event: Error) => void, ctx?: any): this;
 }
 
 /**
@@ -169,8 +175,12 @@ export function getAllCursorPages<T>(cursor: ICursor<T>): Promise<T[]> {
                 firstPage = Promise.resolve(cursor.items);
             }
             else {
-                debug(`getAllCursorPages: firstpage loaded on afterPageChange event`);
-                firstPage = new Promise(resolve => cursor.once('afterPageChange', (x: PageChangeEvent<T>) => resolve(x.items)));
+                debug(`getAllCursorPages: loading firstpage via afterPageChange event..`);
+                firstPage = new Promise((resolve, reject) => {
+                    var pageHandler: Function, errorHandler: Function;
+                    cursor.once('afterPageChange', pageHandler = (x: PageChangeEvent<T>) => void(resolve(x.items)) || cursor.removeListener('error', errorHandler, void 0, true));
+                    cursor.once('error', (e: Error) => void(reject(e)) || cursor.removeListener('afterPageChange', pageHandler, void 0, true));
+                });
             }
         }
         else {
@@ -184,9 +194,11 @@ export function getAllCursorPages<T>(cursor: ICursor<T>): Promise<T[]> {
                 for (var i = 2; i <= cursor.totalPages; i++) {
                     promises.push(cursor.select(i));
                 }
+                debug(`getAllCursorPages: received first and started loading ${promises.length - 1} others`)
                 Promise
                     .all(promises)
                     .then(result => {
+                        debug(`getAllCursorPages: received all pages`)
                         resolve(_.flatten(result));
                     })
                     .catch(reject);

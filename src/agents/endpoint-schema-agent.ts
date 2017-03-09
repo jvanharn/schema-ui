@@ -398,15 +398,11 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
     public delete(identity: EntityIdentity, linkName?: string): Promise<void> {
         // Try to fetch the link name
         let link = this.chooseAppropriateLink([
-            'read', // The name this library propagates.
-            'self', // The official rel name for this kind of method (but not very common).
-            'item', // Defined in the Item and Collection rfc6573
-            'view',
-            'get',
-            'current'
+            'delete', // The name this library propagates.
+            'remove'
         ], linkName);
         if (!link) {
-            return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
+            return Promise.reject(`Couldn't find a usable schema hyperlink name to delete with.`);
         }
 
         // Determine url data
