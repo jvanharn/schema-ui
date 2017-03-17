@@ -1,5 +1,7 @@
 import { ICursor } from './cursor';
 
+import * as _ from 'lodash';
+
 /**
  * Cursor that can be sorted using sort descriptors.
  */
@@ -85,4 +87,33 @@ export function inverseSortMode(mode: SortingDirection): SortingDirection {
         return SortingDirection.Ascending;
     }
     return SortingDirection.Ascending;
+}
+
+/**
+ * Get a list of filters defined in the given object, and sanitize them.
+ *
+ * @param data The (url/body) data object to get the filters out of.
+ *
+ * @return Filters
+ */
+export function getSanitizedSorters(data: any): CollectionSortDescriptor[] {
+    if (!_.isPlainObject(data) || !_.isArray(data.sorters)) {
+        return [];
+    }
+    return _(data.sorters as any[])
+        .map(x => {
+            if (!_.isPlainObject(x) || !_.isString(x.path) || x.length < 3) {
+                return null;
+            }
+            let dir = SortingDirection.Ascending;
+            if (String(x.direction).toUpperCase() === 'DESC' || String(x.direction) === '1') {
+                dir = SortingDirection.Descending;
+            }
+            return {
+                path: String(x.path),
+                direction: dir
+            } as CollectionSortDescriptor;
+        })
+        .filter(x => x != null)
+        .value();
 }

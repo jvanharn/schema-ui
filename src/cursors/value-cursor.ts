@@ -464,13 +464,15 @@ export function filterCollectionBy<T>(collection: T[], filters: CollectionFilter
 function applyFilter(filter: CollectionFilterDescriptor, val: any): boolean {
     switch (filter.operator) {
         case CollectionFilterOperator.Contains:
-            return String(val).indexOf(filter.value) >= 0;
+            return String(val).toLowerCase()
+                .indexOf(String(filter.value).toLowerCase()) >= 0;
         case CollectionFilterOperator.NotContains:
-            return String(val).indexOf(filter.value) < 0;
+            return String(val).toLowerCase()
+                .indexOf(String(filter.value).toLowerCase()) < 0;
         case CollectionFilterOperator.Equals:
-            return String(val) === String(filter.value);
+            return String(val).toLowerCase() === String(filter.value).toLowerCase();
         case CollectionFilterOperator.NotEquals:
-            return String(val) !== String(filter.value);
+            return String(val).toLowerCase() !== String(filter.value).toLowerCase();
         case CollectionFilterOperator.LessThan:
             if (_.isNumber(val)) {
                 return val < filter.value;

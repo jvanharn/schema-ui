@@ -1,5 +1,7 @@
 import { ICursor } from './cursor';
 
+import * as _ from 'lodash';
+
 /**
  * Cursor that can be filtered using filter descriptors.
  */
@@ -79,4 +81,34 @@ export interface CollectionFilterDescriptor {
      * Value of the filter.
      */
     value: any;
+}
+
+/**
+ * Get a list of filters defined in the given object, and sanitize them.
+ *
+ * @param data The (url/body) data object to get the filters out of.
+ *
+ * @return Filters
+ */
+export function getSanitizedFilters(data: any): CollectionFilterDescriptor[] {
+    if (!_.isPlainObject(data) || !_.isArray(data.filters)) {
+        return [];
+    }
+    return _(data.filters as any[])
+        .map(x => {
+            if (!_.isPlainObject(x) || !_.isString(x.path) || x.length < 3) {
+                return null;
+            }
+            let op = parseInt(x.operator);
+            if (_.isInteger(op) || op < 0 || !CollectionFilterOperator[op]) {
+                op = CollectionFilterOperator.Equals;
+            }
+            return {
+                path: String(x.path),
+                operator: op,
+                value: x.value
+            } as CollectionFilterDescriptor;
+        })
+        .filter(x => x != null)
+        .value();
 }

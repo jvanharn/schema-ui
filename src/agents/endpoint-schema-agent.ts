@@ -311,7 +311,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
             return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
         }
 
-        return Promise.resolve(new EndpointCursor<T>(this, link.rel, page, limit));
+        return Promise.resolve(new EndpointCursor<T>(this, link.rel, page, limit, urlData));
     }
 
     /**

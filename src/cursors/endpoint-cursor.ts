@@ -137,6 +137,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
         private readonly linkName: string,
         initialPage: number | null,
         limit?: number,
+        private readonly urlData?: IdentityValues,
         private paginationInfoExtractor: PaginationInfoExtractorFunc = genericPaginationInfoExtractor,
         private paginationRequestGenerator: PaginationRequestGeneratorFunc = genericPaginationRequestGenerator
     ) {
