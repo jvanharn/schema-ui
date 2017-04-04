@@ -13,9 +13,22 @@ const iso8601RegExp = new RegExp(
  */
 export class CommonFormats {
     /**
-     * EAN 13 formatter.
+     * EAN/USP compatible validator.
      */
     public static ean(value: string): boolean {
+        var checkSum = String('00' + value)
+            .slice(-13)
+            .split('')
+            .reduce(function (p: number, v: string, i: number): number {
+                return i % 2 === 0 ? p + 1 * parseInt(v, 10) : p + 3 * parseInt(v, 10);
+            }, 0);
+        return !(checkSum % 10 !== 0);
+    }
+
+    /**
+     * EAN 13 formatter.
+     */
+    public static ean13(value: string): boolean {
         var checkSum = value
             .split('')
             .reduce(function (p: number, v: string, i: number): number {
@@ -23,6 +36,8 @@ export class CommonFormats {
             }, 0);
         return !(checkSum % 10 !== 0);
     }
+
+    public static ean12 = CommonFormats.ean13;
 
     /**
      * ISO 8601 validator.
