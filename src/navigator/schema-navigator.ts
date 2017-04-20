@@ -442,99 +442,128 @@ export class SchemaNavigator {
         }
     //endregion
 
-//region JSON-Pointer helpers
-    /**
-     * Get property or field value.
-     *
-     * @param name The name of the property to fetch.
-     * @param data The data object to fetch the property from.
-     *
-     * @return The value of the property or undefined if not set.
-     */
-    public getPropertyValue(name: string, data: any): any {
-        return pointer.get(data, this.getPropertyPointer(name));
-    }
-
-    /**
-     * Set property or field value.
-     *
-     * @param name The name of the property to set.
-     * @param data The data object to set the property on.
-     * @param value The value of the property.
-     */
-    public setPropertyValue(name: string, data: any, value: any): void {
-        pointer.set(data, this.getPropertyPointer(name), value);
-    }
-
-    /**
-     * Get the property data pointer.
-     *
-     * Get the JSON Pointer pointing to the given field property value in the data object described by this schema.
-     *
-     * @param name The name of the property to get the pointer to.
-     *
-     * @return The pointer to the given property value.
-     */
-    public getPropertyPointer(name: string): string {
-        let prop = _.findKey(this.propertyRoot, (v, k) => k.toLowerCase() === name.toLowerCase())
-        if (prop == null) {
-            return void 0;
-        }
-        return fixJsonPointerPath(this.propertyPrefix + prop);
-    }
-
-    /**
-     * Get the property schema pointers.
-     *
-     * Get the JSON Pointer pointing to the given field property schema/descriptor in this schema
-     *
-     * @param name The name of the property to get the pointer to.
-     *
-     * @return The pointers to the given property schema.
-     */
-    public getPropertySchemaPointer(name: string): string[] {
-        return this.propertyRootSchemaPointerMap[String(name).toLowerCase()];
-    }
-
-    /**
-     * Get the identity value for the given data.
-     *
-     * @param data The data to fetch the identity property value from.
-     *
-     * @return The identity property value.
-     */
-    public getIdentityValue(data: any): IdentityValue {
-        return this.getPropertyValue(this.identityProperty, data);
-    }
-
-    /**
-     * Get all identity property values found in the schema.
-     *
-     * @param data The data to fetch the identity property values from.
-     *
-     * @return The identity property value dictionary.
-     */
-    public getIdentityValues(data: any): IdentityValues {
-        let result: IdentityValues = { };
-        for (var prop of this.identityProperties) {
-            result[prop] = this.getPropertyValue(prop, data);
-        }
-        return result;
-    }
-
-    /**
-     * Creates a cache with properties and how to access them in the schema.
-     */
-    protected createPropertyRootCache(basePath: string, obj: { [key: string]: any }): void {
-        if (!this.propertyRootSchemaPointerMap) {
-            this.propertyRootSchemaPointerMap = { };
+    //region JSON-Pointer helpers
+        /**
+         * Get property or field value.
+         *
+         * @param name The name of the property to fetch.
+         * @param data The data object to fetch the property from.
+         *
+         * @return The value of the property or undefined if not set.
+         */
+        public getPropertyValue(name: string, data: any): any {
+            return pointer.get(data, this.getPropertyPointer(name));
         }
 
-        _.each(obj, (val, key) =>
-            this.propertyRootSchemaPointerMap[key.toLowerCase()] =
-                _.map(this.propertyDefinitionRoots, x => fixJsonPointerPath(_.last(x.split('#'))) + fixJsonPointerPath(basePath, true) + key));
-    }
-//endregion
+        /**
+         * Set property or field value.
+         *
+         * @param name The name of the property to set.
+         * @param data The data object to set the property on.
+         * @param value The value of the property.
+         */
+        public setPropertyValue(name: string, data: any, value: any): void {
+            pointer.set(data, this.getPropertyPointer(name), value);
+        }
+
+        /**
+         * Get the property data pointer.
+         *
+         * Get the JSON Pointer pointing to the given field property value in the data object described by this schema.
+         *
+         * @param name The name of the property to get the pointer to.
+         *
+         * @return The pointer to the given property value.
+         */
+        public getPropertyPointer(name: string): string {
+            let prop = _.findKey(this.propertyRoot, (v, k) => k.toLowerCase() === name.toLowerCase())
+            if (prop == null) {
+                return void 0;
+            }
+            return fixJsonPointerPath(this.propertyPrefix + prop);
+        }
+
+        /**
+         * Get the property schema pointers.
+         *
+         * Get the JSON Pointer pointing to the given field property schema/descriptor in this schema
+         *
+         * @param name The name of the property to get the pointer to.
+         *
+         * @return The pointers to the given property schema.
+         */
+        public getPropertySchemaPointer(name: string): string[] {
+            return this.propertyRootSchemaPointerMap[String(name).toLowerCase()];
+        }
+
+        /**
+         * Get the identity value for the given data.
+         *
+         * @param data The data to fetch the identity property value from.
+         *
+         * @return The identity property value.
+         */
+        public getIdentityValue(data: any): IdentityValue {
+            return this.getPropertyValue(this.identityProperty, data);
+        }
+
+        /**
+         * Get all identity property values found in the schema.
+         *
+         * @param data The data to fetch the identity property values from.
+         *
+         * @return The identity property value dictionary.
+         */
+        public getIdentityValues(data: any): IdentityValues {
+            let result: IdentityValues = { };
+            for (var prop of this.identityProperties) {
+                result[prop] = this.getPropertyValue(prop, data);
+            }
+            return result;
+        }
+
+        /**
+         * Set the identity value for the given data.
+         *
+         * @param data The data to set the identity value on.
+         * @param identity The identity value to set for this data object.
+         */
+        public setIdentityValue(data: any, identity: IdentityValue | IdentityValues): any {
+            if (_.isPlainObject(identity)) {
+                return this.setIdentityValues(data, identity as IdentityValues);
+            }
+
+            this.setPropertyValue(this.identityProperty, data, identity);
+            return data;
+        }
+
+        /**
+         * Set all identity property values found in the schema from the source on the traget data object.
+         *
+         * @param data The data to set the identities value on.
+         * @param identities The identity values to set for this data object.
+         */
+        public setIdentityValues(data: any, identities: IdentityValues): any {
+            for (var prop of this.identityProperties) {
+                this.setIdentityValues(data, this.getPropertyValue(prop, identities));
+            }
+            return data;
+        }
+
+        /**
+         * Creates a cache with properties and how to access them in the schema.
+         */
+        protected createPropertyRootCache(basePath: string, obj: { [key: string]: any }): void {
+            if (!this.propertyRootSchemaPointerMap) {
+                this.propertyRootSchemaPointerMap = { };
+            }
+
+            _.each(obj, (val, key) =>
+                this.propertyRootSchemaPointerMap[key.toLowerCase()] =
+                    _.map(this.propertyDefinitionRoots, x =>
+                        fixJsonPointerPath(_.last(x.split('#'))) + fixJsonPointerPath(basePath, true) + key));
+        }
+    //endregion
 
     /**
      * Whether or not the schema has patterned properties in it's root.
