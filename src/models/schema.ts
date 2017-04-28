@@ -33,12 +33,12 @@ export interface JsonSchema {
     /**
      * Title/label of the property.
      */
-    title?: string;
+    title?: SchemaTranslatableString;
 
     /**
      * Description of the schema/property.
      */
-    description?: string;
+    description?: SchemaTranslatableString;
 
     /**
      * Type of field. E.g. integer, number, string, object, ...
@@ -286,3 +286,9 @@ export type SchemaPropertyMap<T extends JsonSchema> = { [property: string]: T; }
  * Map/dictionary of properties that use regex as the index.
  */
 export type SchemaPatternPropertyMap<T extends JsonSchema> = { [propertyPattern: string]: T; };
+
+/**
+ * Map/dictionary with a language key as index, that can be used to provide localized translation strings.
+ */
+export type SchemaTranslatableString = string | SchemaTranslatableStringMap;
+export type SchemaTranslatableStringMap = { [lang: string]: string };

@@ -15,7 +15,9 @@ import {
     IdentityValues,
 
     SchemaHyperlinkDescriptor,
-    SchemaColumnDescriptor
+    SchemaColumnDescriptor,
+
+    SchemaTranslatableStringMap
 } from '../models/index';
 import {
     fixJsonPointerPath,
@@ -340,6 +342,65 @@ export class SchemaNavigator {
                 return _.includes((this.root.items as JsonSchema).required, name);
             }
             return false;
+        }
+
+        /**
+         * Get the property title property for the given language.
+         *
+         * If the language code is not given, english is returned.
+         * If the schema is a draft-4 formatted title (no multilang), then the value is considered english.
+         *
+         * @param name The name of the property/field.
+         * @param language The language code to fetch the title for (optional).
+         *
+         * @return The title for the given field, for the given language or null if not available for the given language.
+         */
+        public getFieldTitle(name: string, language: string = 'en'): string | null {
+            return this.getFieldTranslatableString(name, 'title', language);
+        }
+
+        /**
+         * Get the property description property for the given language.
+         *
+         * If the language code is not given, english is returned.
+         * If the schema is a draft-4 formatted description (no multilang), then the value is considered english.
+         *
+         * @param name The name of the property/field.
+         * @param language The language code to fetch the title for (optional).
+         *
+         * @return The description for the given field, for the given language or null if not available for the given language.
+         */
+        public getFieldDescription(name: string, language: string = 'en'): string | null {
+            return this.getFieldTranslatableString(name, 'description', language);
+        }
+
+        /**
+         * Get the field's translatable property for the given language.
+         *
+         * If the language code is not given, english is returned.
+         * If the schema is a draft-4 formatted title (no multilang), then the value is considered english.
+         *
+         * @param name The name of the property/field.
+         * @param messageType The property that contains the translatable string(s).
+         * @param language The language code to fetch the title for (optional).
+         *
+         * @return The title for the given field, for the given language or null if not available for the given language.
+         */
+        private getFieldTranslatableMessage(name: string, messageType: string, language: string = 'en'): string | null {
+            if (this.fields[name] == null || _.isEmpty((<any> this.fields[name])[messageType])) {
+                return null;
+            }
+
+            let translatable: string | SchemaTranslatableStringMap = (<any> this.fields[name])[messageType];
+            if (_.isString(translatable)) {
+                return _.startsWith(language, 'en') ? translatable as string : null;
+            }
+
+            if (_.isObject(translatable)) {
+                return _.find(translatable as SchemaTranslatableStringMap, (v: string, k: string) => _.startsWith(k, language));
+            }
+
+            return null;
         }
     //endregion
 

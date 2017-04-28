@@ -4,7 +4,9 @@ export {
     SchemaMediaDescriptor,
     SchemaDefinitionMap,
     SchemaPropertyMap,
-    SchemaPatternPropertyMap
+    SchemaPatternPropertyMap,
+    SchemaTranslatableString,
+    SchemaTranslatableStringMap
 } from './schema';
 export { CommonJsonSchema } from './common';
 export { JsonPatchOperation } from './patch';
