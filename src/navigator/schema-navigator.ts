@@ -356,7 +356,7 @@ export class SchemaNavigator {
          * @return The title for the given field, for the given language or null if not available for the given language.
          */
         public getFieldTitle(name: string, language: string = 'en'): string | null {
-            return this.getFieldTranslatableString(name, 'title', language);
+            return this.getFieldTranslatableMessage(name, 'title', language);
         }
 
         /**
@@ -371,7 +371,7 @@ export class SchemaNavigator {
          * @return The description for the given field, for the given language or null if not available for the given language.
          */
         public getFieldDescription(name: string, language: string = 'en'): string | null {
-            return this.getFieldTranslatableString(name, 'description', language);
+            return this.getFieldTranslatableMessage(name, 'description', language);
         }
 
         /**
