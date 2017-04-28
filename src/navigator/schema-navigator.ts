@@ -160,12 +160,12 @@ export class SchemaNavigator {
                     name = key;
                     current = Math.min(score, 3);
                 }
-                else if (fields.hasOwnProperty(key) && score > 0 && score < current) {
+                else if (fields.hasOwnProperty(key) && score < current) {
                     name = key;
                     current = score;
                 }
 
-                if (score === 1) {
+                if (score === 0) {
                     return key;
                 }
             }
@@ -180,7 +180,7 @@ export class SchemaNavigator {
             let props = this.propertyRoot,
                 identities: string[] = [];
             for (let key in props) {
-                if (props.hasOwnProperty(key) && this.isIdentityProperty(key) > 0) {
+                if (props.hasOwnProperty(key) && this.isIdentityProperty(key) < 4) {
                     identities.push(key);
                 }
             }
@@ -627,25 +627,93 @@ export class SchemaNavigator {
     /**
      * Get whether the given field is an identity property.
      *
-     * @return The priority of the given property as an identifying property. 0 = Not an identity, 1 = Primary identity (Numeric: ID, Id, UId, {SchemaName}Id, ...), 2 = Secondary identity (ItemId, ItemUId, ...), 3 = Composite Primary identity (String/Numeric, name, ...)
+     * Scoring meaning:
+     * - 0 = Primary identity (ID, Id, UId, {SchemaName}Id, ...)
+     * - 1 = Parent identity ({Partial<SchemaName>}Id, ...)
+     * - 2 = Sibling identity identity (ItemId, ItemUId, ...)
+     * - 3 = Composite Primary identity (String/Numeric, name, ...)
+     * - 4 = Not very likely to be an identity
+     *
+     * @param name The property to score.
+     *
+     * @return The priority of the given property as an identifying property.
      */
-    protected isIdentityProperty(name: string): 1 | 2 | 3 | 0 {
-        let lower = name.toLocaleLowerCase(),
-            entity = this.entity.toLocaleLowerCase();
-        if (
-            lower === 'id' || lower === 'uid' || lower === 'guid' ||
-            lower === `${entity}id` || lower === `${entity}uid` ||
-            lower === entity
-        ) {
+    protected isIdentityProperty(name: string): 0 | 1 | 2 | 3 | 4 {
+        let lname = name.toLocaleLowerCase();
+
+        if (this.isPrimaryIdentityProperty(name)) {
+            return 0;
+        }
+        else if (this.isParentIdentityProperty(name)) {
             return 1;
         }
-        else if (lower.indexOf('id') >= 0 || lower.indexOf('uid') >= 0 || lower.indexOf('guid') >= 0) {
+        else if (lname.indexOf('id') >= 0 || lname.indexOf('uid') >= 0 || lname.indexOf('guid') >= 0) {
             return 2;
         }
-        else if (lower === 'name' || lower === 'identity' || lower === 'internalname') {
+        else if (lname === 'name' || lname === 'identity' || lname === 'internalname') {
             return 3;
         }
-        return 0;
+        return 4;
+    }
+
+    /**
+     * Check whether or not the given proeprty is (the) primary identity property.
+     *
+     * @param name The property name to identify.
+     */
+    protected isPrimaryIdentityProperty(name: string): boolean {
+        var lname = name.toLowerCase().replace(/[^0-9a-z]/gi, ''),
+            entity = this.entity.toLowerCase();
+
+        if (lname === 'id' || lname === 'uid' || lname === 'guid') {
+            return true;
+        }
+
+        if (this.hasIdentitySuffix(lname, entity)) {
+            return true;
+        }
+
+        return false;
+    }
+
+
+    /**
+     * Check whether or not the given property is a parent property.
+     *
+     * @param name The property name to identify.
+     */
+    protected isParentIdentityProperty(name: string): boolean {
+        var parents = this.entity.match(/[A-Z][a-z]+/g),
+            current = parents.pop().toLowerCase(),
+            lname = name.toLowerCase().replace(/[^0-9a-z]/gi, '');
+
+        // Check whether the property is a reference in a chained table.
+        if (lname === current + 'id' || lname === current + 'uid') {
+            return false;
+        }
+
+        // Check most combinations of the parent properties.
+        for (let i = 0; i < parents.length; i++) {
+            current = parents.slice(0, i).join().toLowerCase();
+            if (this.hasIdentitySuffix(lname, current)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check whether or not the given property has an identity like suffix.
+     *
+     * @param name The name to check with.
+     * @param comparable The thing to compare with, and to check for an identity like suffix.
+     */
+    protected hasIdentitySuffix(name: string, comparable: string): boolean {
+        if (name === comparable + 'id' || name === comparable + 'uid' || name === comparable) {
+            return true;
+        }
+        return false;
     }
 
     /**
