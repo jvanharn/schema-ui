@@ -61,6 +61,8 @@ export enum CollectionFilterOperator {
 
     Contains,
     NotContains,
+
+    ContainsKey,
 }
 
 /**
