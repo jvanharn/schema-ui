@@ -470,7 +470,11 @@ function applyFilter(filter: CollectionFilterDescriptor, val: any): boolean {
             if (!_.isObject(val)) {
                 return false;
             }
-            return typeof val[String(filter.value).toLowerCase()] !== 'undefined';
+            let keys = _.keys(val);
+            if (_.isArray(filter.value)) {
+                return _.every(filter.value, x => _.includes(keys, String(x).toLowerCase()));
+            }
+            return _.includes(keys, String(filter.value).toLowerCase());
         case CollectionFilterOperator.NotContains:
             return String(val).toLowerCase()
                 .indexOf(String(filter.value).toLowerCase()) < 0;
