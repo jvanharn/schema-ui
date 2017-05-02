@@ -466,6 +466,11 @@ function applyFilter(filter: CollectionFilterDescriptor, val: any): boolean {
         case CollectionFilterOperator.Contains:
             return String(val).toLowerCase()
                 .indexOf(String(filter.value).toLowerCase()) >= 0;
+        case CollectionFilterOperator.ContainsKey:
+            if (!_.isObject(val)) {
+                return false;
+            }
+            return typeof val[String(filter.value).toLowerCase()] !== 'undefined';
         case CollectionFilterOperator.NotContains:
             return String(val).toLowerCase()
                 .indexOf(String(filter.value).toLowerCase()) < 0;
