@@ -382,8 +382,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
         }
 
         // Make the request
-        return bodyData.then(sendable =>
-            this.execute(link, sendable, urlData));
+        return bodyData.then<any>(sendable => this.execute(link, sendable, urlData));
     }
 
 

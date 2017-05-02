@@ -420,7 +420,37 @@ export class SchemaNavigator {
         public get columns(): SchemaColumnDescriptor[] {
             return _.isArray((this.schema as JsonTableSchema).columns)
                 ? (this.schema as JsonTableSchema).columns
-                : new Array;
+                : this.generateColumns();
+        }
+
+        /**
+         * Generate a list of column descriptors, if the entity does not contain one.
+         */
+        public generateColumns(): SchemaColumnDescriptor[] {
+            let props = this.propertyRoot,
+                cols: SchemaColumnDescriptor[] = [];
+            for (var key in props) {
+                if (!props.hasOwnProperty(key)) {
+                    continue;
+                }
+
+                if (!_.includes(String(key).toLowerCase(), 'id') && _.includes(['string', 'number', 'integer', 'boolean'], props[key].type)) {
+                    var type: string = null;
+                    if (props[key].type === 'string' && props[key].format != null) {
+                        type = props[key].format;
+                    }
+                    else if (props[key].type === 'boolean') {
+                        type = 'boolean';
+                    }
+
+                    cols.push({
+                        id: key,
+                        path: '/' + key,
+                        type
+                    } as SchemaColumnDescriptor);
+                }
+            }
+            return cols;
         }
     //endregion
 
