@@ -91,12 +91,19 @@ export function getApplicablePropertyDefinitions(schema: JsonSchema, propertyPat
                 schemaPathPrefix + '/properties/' + current);
         }
         if (!!schema.patternProperties) {
-            return _.flatMap(schema.patternProperties, (sub, key) =>
-                getApplicablePropertyDefinitions(
+            return _.flatMap(schema.patternProperties, (sub, key) => {
+                // Check if the key is applicable.
+                var regex = new RegExp(String(key));
+                if (!regex.test(String(_.first(cleaned)))) {
+                    return [];
+                }
+
+                return getApplicablePropertyDefinitions(
                     sub,
                     '/' + cleaned.slice(1).join('/'),
                     referenceResolver,
-                    schemaPathPrefix + '/patternProperties/' + key));
+                    schemaPathPrefix + '/patternProperties/' + key)
+            });
         }
     }
     else if (schema.type === 'array') {

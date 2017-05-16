@@ -97,34 +97,43 @@ export class SchemaNavigator {
          */
         public get root(): JsonSchema | JsonFormSchema | JsonTableSchema {
             if (!this._root) {
-                this._root = _.assign.apply(_, _.map(this.propertyDefinitionRoots, x => {
-                    try {
-                        var [url, path] = x.split('#');
-                        var schema = this.getEmbeddedSchema(url);
-                        if (!schema) {
-                            throw new Error(`Unable to find the schema id ${url}.`);
+                this._root = _
+                    .partialRight(_.assignInWith, (a: any, b: any) => {
+                        if (_.isObject(a) && _.isObject(b)) {
+                            return _.assign(a, b);
                         }
-
-                        if (path == null || path === '/' || path === '') {
-                            return schema;
+                        else if (_.isArray(a) && _.isArray(b)) {
+                            return _.concat(a, b);
                         }
+                    })
+                    .apply(_, _.map(this.propertyDefinitionRoots, x => {
+                        try {
+                            var [url, path] = x.split('#');
+                            var schema = this.getEmbeddedSchema(url);
+                            if (!schema) {
+                                throw new Error(`Unable to find the schema id ${url}.`);
+                            }
 
-                        let sub = pointer.get(schema, path);
-                        if (!!sub && sub.$ref != null) {
-                            sub = this.getEmbeddedSchema(sub.$ref);
+                            if (path == null || path === '/' || path === '') {
+                                return schema;
+                            }
+
+                            let sub = pointer.get(schema, path);
+                            if (!!sub && sub.$ref != null) {
+                                sub = this.getEmbeddedSchema(sub.$ref);
+                            }
+
+                            if (!_.isObject(sub) || _.isEmpty(sub)) {
+                                throw new Error('The property root contained a $ref that pointed to a non-existing(at least not embedded) schema!');
+                            }
+
+                            return sub;
                         }
-
-                        if (!_.isObject(sub) || _.isEmpty(sub)) {
-                            throw new Error('The property root contained a $ref that pointed to a non-existing(at least not embedded) schema!');
+                        catch (e) {
+                            debug(`[warn] unable to fetch the root on path "${x}":`, e);
+                            return { };
                         }
-
-                        return sub;
-                    }
-                    catch (e) {
-                        debug(`[warn] unable to fetch the root on path "${x}":`, e);
-                        return { };
-                    }
-                }));
+                    }));
 
                 if (!_.isObject(this._root) || _.isEmpty(this._root)) {
                     throw new Error('Unable to determine the correct property root!');
