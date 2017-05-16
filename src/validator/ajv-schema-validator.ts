@@ -172,7 +172,12 @@ export class AjvSchemaValidator implements ISchemaValidator {
         if (!!this.fetcher) {
             return this.fetcher.fetchSchema(ref).then(schema => {
                 if (!!this.cache) {
-                    this.cache.setSchema(schema);
+                    try {
+                        this.cache.setSchema(schema);
+                    }
+                    catch(e) {
+                        debug(`Succesfully fetched the schema ${ref}, but could not store it in the cache.`);
+                    }
                 }
                 return schema;
             });

@@ -23,8 +23,9 @@ import { SchemaNavigator } from '../navigator/schema-navigator';
 import { ISchemaValidator, AjvSchemaValidator } from '../validator/index';
 
 import * as urltemplate from 'url-template';
-import { compare, apply } from 'fast-json-patch';
+import jsonpatch from 'fast-json-patch';
 import * as axios from 'axios';
+import * as qs from 'qs';
 import * as _ from 'lodash';
 
 import * as debuglib from 'debug';
@@ -33,7 +34,7 @@ var debug = debuglib('schema:endpoint:agent');
 /**
  * Mimetype for json-patch.
  */
-const jsonPatchMimeType = 'application/json-patch';
+export const jsonPatchMimeType = 'application/json-patch';
 
 /**
  * Schema interpreter and "hyper/media-link" agent.
@@ -120,7 +121,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
                 // Check validation
                 if (validation != null && !validation.valid) {
                     debug(`[error] request validation failed against [${this.schema.root.id}].links.${link.rel}.requestSchema: `, validation.errors);
-                    throw new Error(`Unable to send the message using link "${link.rel}", the request-body was not formatted correctly according to the request-schema included in the link definition.`);
+                    throw new ValidationError(`Unable to send the message using link "${link.rel}", the request-body was not formatted correctly according to the request-schema included in the link definition.`, validation.errors);
                 }
 
                 // Get the headers
@@ -135,6 +136,9 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
                     url: this.rebaseSchemaHyperlinkHref(this.fillSchemaHyperlinkParameters(link.href, urlData || data)),
                     method: link.method || 'GET',
                     headers: requestHeaders,
+                    paramsSerializer: function(params) {
+                        return qs.stringify(params, { arrayFormat: 'indices' })
+                    }
                 };
 
                 // Set the data
@@ -167,6 +171,10 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
                 } as SchemaAgentResponse<TResponse>;
             })
             .catch((error: Error & { response: Axios.AxiosXHR<any> }) => {
+                if (!error.response) {
+                    throw error;
+                }
+
                 var errorToken: string = 'UNKNOWN_ERROR', errorRoot: any, xhr = error.response;
                 if (!xhr.data) {
                     errorRoot = xhr.data;
@@ -362,7 +370,13 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
 
         // Determine the source and target data types.
         let sourcePatch = (_.isArray(data) && !_.isEmpty(data) && !!data[0].op),
-            targetPatch = (link.encType === jsonPatchMimeType);
+            targetPatch = _.startsWith(link.encType, jsonPatchMimeType);
+
+        // Set headers
+        let headers: HeaderDictionary = {};
+        if (targetPatch) {
+            headers['content-type'] = jsonPatchMimeType;
+        }
 
         // Determine body data
         let bodyData: Promise<any>;
@@ -373,16 +387,19 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
         else if (!sourcePatch && targetPatch) {
             // We need to generate patch ops for the given data object.
             // Read the original object and generate the patch ops.
-            bodyData = this.read(urlData).then(original => compare(original, data as T));
+            bodyData = this.read(urlData).then(original => jsonpatch.compare(original, data as T));
         }
         else if (sourcePatch && !targetPatch) {
             // We have patch, and we need to put the whole object.
             // Read the original and apply the patches on it.
-            bodyData = this.read(urlData).then(original => apply(original, data as any));
+            bodyData = this.read(urlData).then(original => {
+                jsonpatch.apply(original, data as any, true);
+                return original;
+            });
         }
 
         // Make the request
-        return bodyData.then<any>(sendable => this.execute(link, sendable, urlData));
+        return bodyData.then<any>(sendable => this.execute(link, sendable, urlData, headers));
     }
 
 
@@ -505,5 +522,25 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
             return this.schema.getLink(userRel);
         }
         return this.schema.getFirstLink(defaults);
+    }
+}
+
+/**
+ * Error thrown when the call doesnt validate.
+ */
+class ValidationError extends Error {
+    public name: string = 'ValidationError';
+    public code: number = 400;
+    public headers: HeaderDictionary = null;
+    public token: string = 'INVALID_ENTITY_DOCUMENT';
+    public data: any;
+
+    public constructor(message: string, validationErrors?: any) {
+        super(message);
+
+        this.data = validationErrors;
+
+        // Set the prototype explicitly.
+        (Object as any).setPrototypeOf(this, ValidationError.prototype);
     }
 }

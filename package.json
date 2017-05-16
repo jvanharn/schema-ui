@@ -1,6 +1,6 @@
 {
   "name": "json-schema-services",
-  "version": "0.2.0",
+  "version": "0.2.6",
   "description": "Library that makes it easy to work with JsonSchema-enabled services. Requires Promises (polyfill with es6-promise if not available on your platform).",
   "main": "esm/index.js",
   "module": "esm/index.js",
@@ -28,6 +28,7 @@
     "fast-json-patch": "^1.1.4",
     "json-pointer": "^0.6.0",
     "lodash": "^4.17.2",
+    "qs": "^6.4.0",
     "url-template": "^2.0.8"
   }
 }
