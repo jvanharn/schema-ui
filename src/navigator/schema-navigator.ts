@@ -617,8 +617,16 @@ export class SchemaNavigator {
         public getIdentityValues(data: any): IdentityValues {
             let result: IdentityValues = { };
             for (var prop of this.identityProperties) {
-                result[prop] = this.getPropertyValue(prop, data);
+                try {
+                    result[prop] = this.getPropertyValue(prop, data);
+                }
+                catch (e) { /* */ }
             }
+
+            if (_.isEmpty(result)) {
+                throw new Error('Unable to fetch any identity value!');
+            }
+
             return result;
         }
 

@@ -217,7 +217,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
      *
      * @return Promise that resolves into the id of the created product.
      */
-    public create<T>(item: T, urlData?: IdentityValues, linkName?: string): Promise<IdentityValue> {
+    public create<T>(item: T, urlData?: IdentityValues, linkName?: string): Promise<IdentityValues> {
         // Try to fetch the link name
         let link = this.chooseAppropriateLink([
             'create', // The name this library propagates.
@@ -229,7 +229,36 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
         }
 
         // Execute the request
-        return this.execute<T, any>(link, item, urlData).then(response => this.schema.getIdentityValue(response.body));
+        return this.execute<T, any>(link, item, urlData).then(response => {
+            try {
+                // Multiple affected probably
+                if (_.isArray(response.body)) {
+                    return _.map(response.body, x => {
+                        // Single affected
+                        if (_.isObject(response.body)) {
+                            return this.schema.getIdentityValues(response.body);
+                        }
+
+                        // Probably a single identity item
+                        return this.schema.setIdentityValue({}, response.body);
+                    });
+                }
+
+                // Single affected
+                else if (_.isObject(response.body)) {
+                    return this.schema.getIdentityValues(response.body);
+                }
+
+                // Probably a single identity item
+                else {
+                    return this.schema.setIdentityValue({}, response.body);
+                }
+            }
+            catch (e) {
+                debug(`[warn] unable to fetch created object's identity`);
+                return response.body;
+            }
+        });
     }
 
     /**

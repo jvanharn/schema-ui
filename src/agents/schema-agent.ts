@@ -39,7 +39,7 @@ export interface ISchemaAgent {
      * @param urlData (Optionally) Data object to resolve parameters from the url in. If not set, uses the data/item object.
      * @param linkName The name of the link to use to create the item with.
      */
-    create<T>(item: T, urlData?: IdentityValues, linkName?: string): Promise<IdentityValue>;
+    create<T>(item: T, urlData?: IdentityValues, linkName?: string): Promise<IdentityValue | IdentityValues>;
 
     /**
      * Read an item of the currently set schema.
