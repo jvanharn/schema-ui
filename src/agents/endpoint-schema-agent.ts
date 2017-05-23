@@ -160,7 +160,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
                     first: any;
 
                 // If the object only contains one item that is an object, just return that as the object.
-                if (_.isObject(xhr.data) && _.size(xhr.data as any) === 1 && _.isPlainObject(first = _.find(xhr.data as any, x => true))) {
+                if (_.isObject(xhr.data) && _.size(xhr.data as any) === 1 && (_.isPlainObject(first = _.find(xhr.data as any, x => true)) || _.isArray(first))) {
                     body = first;
                 }
 
@@ -233,14 +233,14 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
             try {
                 // Multiple affected probably
                 if (_.isArray(response.body)) {
-                    return _.map(response.body, x => {
+                    return _.map(response.body as any[], x => {
                         // Single affected
-                        if (_.isObject(response.body)) {
-                            return this.schema.getIdentityValues(response.body);
+                        if (_.isObject(x)) {
+                            return this.schema.getIdentityValues(x);
                         }
 
                         // Probably a single identity item
-                        return this.schema.setIdentityValue({}, response.body);
+                        return this.schema.setIdentityValue({}, x);
                     });
                 }
 
@@ -254,8 +254,8 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
                     return this.schema.setIdentityValue({}, response.body);
                 }
             }
-            catch (e) {
-                debug(`[warn] unable to fetch created object's identity`);
+            catch (err) {
+                debug(`[warn] unable to fetch created object's identity:`, err);
                 return response.body;
             }
         });
