@@ -215,7 +215,7 @@ export class LocalStorageSchemaCache implements ISchemaCache {
          * Get the schema name by taking the last part of the schema id.
          */
         private getSchemaNameForSchemaId(schemaId: string): string {
-            return _.kebabCase(schemaId.split('/').pop().split('#').shift());
+            return _.kebabCase(schemaId.split('/').slice(2).join('-'));
         }
 
         /**

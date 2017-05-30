@@ -35,7 +35,7 @@ export function getSchemaEntity(schema: JsonSchema): string | null {
         return (schema as CommonJsonSchema).entity;
     }
     if (!!schema.id) {
-        return this.convertSchemaIdToEntityName(schema.id);
+        return convertSchemaIdToEntityName(schema.id);
     }
     return null;
 }
