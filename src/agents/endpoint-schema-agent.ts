@@ -170,42 +170,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
                     body: body
                 } as SchemaAgentResponse<TResponse>;
             })
-            .catch((error: Error & { response: Axios.AxiosXHR<any> }) => {
-                if (!error.response) {
-                    throw error;
-                }
-
-                var errorToken: string = 'UNKNOWN_ERROR', errorRoot: any, xhr = error.response;
-                if (!xhr.data) {
-                    errorRoot = xhr.data;
-                    errorToken = xhr.statusText;
-                }
-                else {
-                    if (_.size(xhr.data as any) === 1) {
-                        _.each(xhr.data, x => errorRoot = x);
-                    }
-                    else {
-                        errorRoot = xhr.data;
-                    }
-
-                    if (_.isArray(errorRoot)) {
-                        errorRoot = _.first(errorRoot);
-                    }
-
-                    let keys = _.keys(errorRoot),
-                        tokenKey = _.find(keys, x => _.includes(['token', 'message', 'detail'], x.toLowerCase()));
-                    if (!!tokenKey) {
-                        errorToken = String(errorRoot[tokenKey]);
-                    }
-                }
-
-                throw {
-                    code: xhr.status,
-                    headers: xhr.headers,
-                    token: _.snakeCase(errorToken).toUpperCase(),
-                    data: errorRoot
-                } as SchemaAgentRejection;
-            });
+            .catch(mapAxiosErrorToSchemaAgentRejection);
     }
 
     /**
@@ -572,4 +537,47 @@ class ValidationError extends Error {
         // Set the prototype explicitly.
         (Object as any).setPrototypeOf(this, ValidationError.prototype);
     }
+}
+
+/**
+ * Map an axios error response, or regular error object to an schema agent rejection object.
+ *
+ * @param error The original caught error to map.
+ * @throws SchemaAgentRejection
+ */
+export function mapAxiosErrorToSchemaAgentRejection(error: Error & { response: Axios.AxiosXHR<any> }): never {
+    if (!error.response) {
+        throw error;
+    }
+
+    var errorToken: string = 'UNKNOWN_ERROR', errorRoot: any, xhr = error.response;
+    if (!xhr.data) {
+        errorRoot = xhr.data;
+        errorToken = xhr.statusText;
+    }
+    else {
+        if (_.size(xhr.data as any) === 1) {
+            _.each(xhr.data, x => errorRoot = x);
+        }
+        else {
+            errorRoot = xhr.data;
+        }
+
+        if (_.isArray(errorRoot)) {
+            errorRoot = _.first(errorRoot);
+        }
+
+        let keys = _.keys(errorRoot),
+            tokenKey = _.find(keys, x => _.includes(['token', 'message', 'detail'], x.toLowerCase()));
+        if (!!tokenKey) {
+            errorToken = String(errorRoot[tokenKey]);
+        }
+    }
+
+    throw {
+        code: xhr.status,
+        headers: xhr.headers,
+        token: _.snakeCase(errorToken).toUpperCase(),
+        data: errorRoot
+    } as SchemaAgentRejection;
 }
