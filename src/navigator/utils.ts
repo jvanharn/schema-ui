@@ -62,7 +62,7 @@ export function getApplicablePropertyDefinitions(schema: JsonSchema, propertyPat
             schemaPathPrefix = schema.id + '';
         }
         else {
-            schemaPathPrefix = schema.id + '#';
+            schemaPathPrefix = (schema.id || '') + '#';
         }
     }
 

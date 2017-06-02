@@ -542,10 +542,10 @@ class ValidationError extends Error {
 /**
  * Map an axios error response, or regular error object to an schema agent rejection object.
  *
- * @param error The original caught error to map.
+ * @param {Error & { response: Axios.AxiosXHR<any> }} error The original caught error to map.
  * @throws SchemaAgentRejection
  */
-export function mapAxiosErrorToSchemaAgentRejection(error: Error & { response: Axios.AxiosXHR<any> }): never {
+export function mapAxiosErrorToSchemaAgentRejection(error: any): never {
     if (!error.response) {
         throw error;
     }
