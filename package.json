@@ -1,6 +1,6 @@
 {
   "name": "json-schema-services",
-  "version": "0.2.10",
+  "version": "0.3.1",
   "description": "Library that makes it easy to work with JsonSchema-enabled services. Requires Promises (polyfill with es6-promise if not available on your platform).",
   "main": "esm/index.js",
   "module": "esm/index.js",
@@ -20,7 +20,7 @@
   "author": "Jeffrey vH",
   "license": "MIT",
   "dependencies": {
-    "ajv": "^4.11.3",
+    "ajv": ">=4.11.3 <5.0.0",
     "axios": "^0.15.3",
     "buffer": "^5.0.4",
     "debug": "^2.6.0",

@@ -26,6 +26,11 @@ import {
 } from './utils';
 
 /**
+ * The default fieldset name, if none is defined.
+ */
+export const defaultFieldsetId = 'default';
+
+/**
  * Helper object for retrieving information from json-schema's.
  */
 export class SchemaNavigator {
@@ -321,8 +326,7 @@ export class SchemaNavigator {
                     continue;
                 }
 
-                let item = (props[key] as JsonFormSchema).field;
-                if (!!item && (item.visible === true || (item.type != null && item.visible !== false))) {
+                if (this.qualifiesAsFormField(props[key] as JsonFormSchema)) {
                     fields[key] = props[key] as JsonFormSchema;
                 }
             }
@@ -330,13 +334,88 @@ export class SchemaNavigator {
         }
 
         /**
+         * Get all fields in the form grouped by fieldsetid.
+         */
+        public get fieldsets(): FieldsetFieldMap {
+            return this.getFieldsetsFromPropertyRoot(this.propertyRoot as SchemaPropertyMap<JsonFormSchema>, '/', defaultFieldsetId, name => this.isFieldRequired('/' + name));
+        }
+
+        /**
+         * Checks whether the given schema qualifies as a subschema/fieldset.
+         */
+        private qualifiesAsSubform(field: JsonFormSchema): boolean {
+            return field.type === 'object' && _.isObject(field.properties);
+        }
+
+        /**
+         * Checks whether the given schema is a visible form field.
+         */
+        private qualifiesAsFormField(field: JsonFormSchema): boolean {
+            return (!!field.field && (field.field.visible === true || (field.field.type != null && field.field.visible !== false)));
+        }
+
+        /**
+         * Get fieldsets from the given property root.
+         */
+        private getFieldsetsFromPropertyRoot(
+            properties: SchemaPropertyMap<JsonFormSchema>,
+            pointerPrefix: string = '/',
+            fieldsetId: string = defaultFieldsetId,
+            isRequiredProperty?: (name: string) => boolean
+        ): FieldsetFieldMap {
+            var props = properties,
+                fieldsets: FieldsetFieldMap = Object.create({});
+            for (var key in props) {
+                if (!props.hasOwnProperty(key)) {
+                    continue;
+                }
+
+                if (this.qualifiesAsSubform(props[key] as JsonFormSchema)) {
+                    _.assign(
+                        fieldsets,
+                        this.getFieldsetsFromPropertyRoot(
+                            props[key].properties as SchemaPropertyMap<JsonFormSchema>,
+                            pointerPrefix + key + '/',
+                            _.camelCase(pointerPrefix + key),
+                            name => _.includes(props[key].required, name)));
+                }
+                else if (this.qualifiesAsFormField(props[key] as JsonFormSchema)) {
+                    if (fieldsets[fieldsetId] == null) {
+                        fieldsets[fieldsetId] = [];
+                    }
+
+                    fieldsets[fieldsetId].push(_.assign({
+                        name: key,
+                        pointer: pointerPrefix + key,
+                        isRequired: isRequiredProperty(key)
+                    }, props[key] as ExtendedFieldDescriptor) as ExtendedFieldDescriptor);
+                }
+            }
+            return fieldsets;
+        }
+
+        /**
          * Check whether the field in this schema root is required.
          *
-         * @param name The name of the field to check. Has to be returned by the fields property.
+         * @param fieldPath The field-name or -pointer of the field to check. Has to be returned by the fields property.
          *
          * @return Whether or not the given field is required.
          */
         public isFieldRequired(name: string): boolean {
+            // var pieces = fieldPath.split('/').filter(x => !_.isEmpty(x)),
+            //     subPath = '/' + pieces.slice(0, pieces.length-2).join('/'),
+            //     applicable = getApplicablePropertyDefinitions(this.root, subPath, ref => this.getEmbeddedSchema(ref));
+
+            // for (var path of applicable) {
+            //     var subpieces = path.split('/'), requiredPath = '/' + subpieces.slice(0, subpieces.length - 2).join('/') + 'required';
+            //     try {
+            //         if (_.endsWith(subpieces[pieces.length-1].toLowerCase(), 'properties') && _.includes(pointer.get(this.root, requiredPath), _.last(pieces))) {
+            //             return true;
+            //         }
+            //     }
+            //     catch (e) { /* */ }
+            // }
+            // return false;
             if (this.hasPatternProperties()) {
                 if (this._patternRequiredPropertyCache == null) {
                     this.propertyRoot;
@@ -840,4 +919,29 @@ export class SchemaNavigator {
             }
         }
     }
+}
+
+/**
+ * Map/dictionary containing property names and a sub-schema.
+ */
+export type FieldsetFieldMap = { [fieldsetId: string]: ExtendedFieldDescriptor[]; };
+
+/**
+ * Extension to the default JsonFormSchema that is generated by the SchemaNavigator to convey additional calculated data for form-builders.
+ */
+export interface ExtendedFieldDescriptor extends JsonFormSchema {
+    /**
+     * Original property name of the field.
+     */
+    name: string;
+
+    /**
+     * The pointer you can use to fetch the property value.
+     */
+    pointer: string;
+
+    /**
+     * Whether or not this field is required.
+     */
+    isRequired: boolean;
 }
