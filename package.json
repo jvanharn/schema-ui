@@ -20,7 +20,7 @@
   "author": "Jeffrey vH",
   "license": "MIT",
   "dependencies": {
-    "ajv": ">=4.11.3 <5.0.0",
+    "ajv": "4.11.8",
     "axios": "^0.15.3",
     "buffer": "^5.0.4",
     "debug": "^2.6.0",
