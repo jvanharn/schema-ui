@@ -1,4 +1,3 @@
-import {  } from 'sh-lib-client';
 import {
     JsonSchema,
 
@@ -20,7 +19,7 @@ import { CollectionSortDescriptor } from '../cursors/sortable-cursor';
 import { EndpointCursor } from '../cursors/endpoint-cursor';
 
 import { SchemaNavigator } from '../navigator/schema-navigator';
-import { ISchemaValidator, AjvSchemaValidator } from '../validator/index';
+import { ISchemaValidator, AjvSchemaValidator, ValidatorCache } from '../validator/index';
 
 import * as urltemplate from 'url-template';
 import jsonpatch from 'fast-json-patch';
@@ -69,23 +68,39 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
     public validateRequests: boolean = true;
 
     /**
+     * The validator to help us validate incomming and outgoing requests before they are performed.
+     */
+    public get validator(): ISchemaValidator {
+        if (this._validator == null) {
+            this._validator = this.getValidator();
+        }
+        return this._validator;
+    }
+    public set validator(validator: ISchemaValidator) {
+        this._validator = validator;
+    }
+    private _validator: ISchemaValidator;
+
+    /**
      * Construct a new schema agent using a SchemaNavigator.
      *
      * @param schema The schema-navigator used to easily extract link information from the schema.
      * @param cache The schema cache to use to fetch schema's not currently known to the agent.
      * @param fetcher The fetcher to enable us to fetch schema's that are currently not available.
      * @param validator The validator to help us validate incomming and outgoing requests before they are performed.
+     * @param validators An validator cache instance, that makes it easier to fetch the validator for a schema.
      * @param parent Parent schema for this agent.
      */
     public constructor(
         public readonly schema: SchemaNavigator,
         protected readonly cache: ISchemaCache,
         protected readonly fetcher: ISchemaFetcher,
-        public readonly validator?: ISchemaValidator,
-        public readonly parent?: ISchemaAgent
+        validator?: ISchemaValidator,
+        public readonly validators?: ValidatorCache,
+        public readonly parent?: ISchemaAgent,
     ) {
-        if (validator == null) {
-            this.validator = new AjvSchemaValidator(schema, cache, fetcher);
+        if (validator != null) {
+            this.validator = validator;
         }
     }
 
@@ -112,7 +127,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
                         debug(`validate request against [${this.schema.root.id}] own schema`);
                         return this.validator.validate(data);
                     }
-                    let validator = new AjvSchemaValidator(new SchemaNavigator(requestSchema), this.cache, this.fetcher);
+                    let validator = this.getValidator(new SchemaNavigator(requestSchema));
                     debug(`validate request against [${this.schema.root.id}].links.${link.rel}.requestSchema`);
                     return validator.validate(data);
                 }
@@ -448,6 +463,18 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
         }
 
         return last;
+    }
+
+    /**
+     * Get a validator instance to use and validate the given schema navigator.
+     *
+     * @param schema (Optionally) the schema to validate for, if not the one associated with this agent.
+     */
+    public getValidator(schema: SchemaNavigator = this.schema): ISchemaValidator {
+        if (this.validators != null) {
+            return this.validators.getValidator(this.schema);
+        }
+        return new AjvSchemaValidator(this.schema, this.cache, this.fetcher);
     }
 
     /**

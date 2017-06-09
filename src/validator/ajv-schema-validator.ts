@@ -42,12 +42,22 @@ export class AjvSchemaValidator implements ISchemaValidator {
         protected readonly fetcher?: ISchemaFetcher,
         options?: ajv.Options
     ) {
+        debug(`initialized AJV Schema Validator for schema.$id "${schema.original.id || schema.schemaId}"`);
+
         this.validator = new ajv(
             _.assign({
                 formats: _.assign({}, CommonFormats, AjvSchemaValidator.formats),
                 loadSchema: (uri: string, cb: (err: Error, schema: Object) => any) =>
                     this.resolveMissingSchemaReference(uri)
-                        .then(x => cb(null, x))
+                        .then(x => {
+                            // Catch any errors about the given schema already being registered.
+                            try {
+                                cb(null, x);
+                            }
+                            catch (e) {
+                                debug('[warn] error ocurred whilst calling callback off requested ajv-schema, ironically: ', e);
+                            }
+                        })
                         .catch(e => cb(e, void 0)),
                 inlineRefs: false
             } as ajv.Options, options));
@@ -84,11 +94,19 @@ export class AjvSchemaValidator implements ISchemaValidator {
 
         this.compiledSchema = new Promise((resolve, reject) =>
             this.validator.compileAsync(this.schema.original, (err, validate) => {
-                if (err != null) {
+                if (err == null) {
+                    debug(`compiled ajv schema validator for schema.$id "${schema.original.id || schema.schemaId}"`);
+                    resolve(validate);
+                }
+                else if (_.endsWith(err.message, 'already exists')) {
+                    debug(`[error] compilation failed of schema [${this.schema.schemaId}] because of a race condition triggered when multiple ajv.compileAsync calls are triggered at the same time`);
+                    debug('you can solve the above race condition by making sure they are always called in sequence, and never in parralel');
+                    reject(err);
+                }
+                else {
                     debug(`[error] compilation failed of schema [${this.schema.schemaId}]: ${err.message}`);
                     reject(err);
                 }
-                resolve(validate);
             }));
     }
 
