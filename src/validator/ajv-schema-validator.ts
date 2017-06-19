@@ -4,7 +4,7 @@ import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
 
 import { CommonFormats } from './common-formats';
-import { ISchemaValidator, ValidationError, ValidationResult } from './schema-validator';
+import { ISchemaValidator, ICompiledSchemaValidator, ValidationError, ValidationResult } from './schema-validator';
 
 import * as ajv from 'ajv';
 import * as _ from 'lodash';
@@ -15,7 +15,7 @@ var debug = debuglib('schema:validator:ajv');
 /**
  * Class that helps with the validation of a schema or it's properties.
  */
-export class AjvSchemaValidator implements ISchemaValidator {
+export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaValidator {
     /**
      * Formats globally registered.
      */
@@ -42,13 +42,23 @@ export class AjvSchemaValidator implements ISchemaValidator {
         protected readonly fetcher?: ISchemaFetcher,
         options?: ajv.Options
     ) {
+        debug(`initialized AJV Schema Validator for schema.$id "${schema.original.id || schema.schemaId}"`);
+
         this.validator = new ajv(
             _.assign({
                 formats: _.assign({}, CommonFormats, AjvSchemaValidator.formats),
                 loadSchema: (uri: string, cb: (err: Error, schema: Object) => any) =>
                     this.resolveMissingSchemaReference(uri)
-                        .then(x => cb(null, x))
-                        .catch(e => cb(e, null)),
+                        .then(x => {
+                            // Catch any errors about the given schema already being registered.
+                            try {
+                                cb(null, x);
+                            }
+                            catch (e) {
+                                debug('[warn] error ocurred whilst calling callback off requested ajv-schema, ironically: ', e);
+                            }
+                        })
+                        .catch(e => cb(e, void 0)),
                 inlineRefs: false
             } as ajv.Options, options));
 
@@ -82,11 +92,29 @@ export class AjvSchemaValidator implements ISchemaValidator {
         //     } as JsonSchema
         // } as any);
 
-        this.validator.compileAsync(this.schema.original, (err, validate) => {
-            if (err != null) {
-                debug(`[error] compilation failed of schema [${this.schema.schemaId}]: ${err.message}`);
-            }
-        });
+        this.compiledSchema = new Promise((resolve, reject) =>
+            this.validator.compileAsync(this.schema.original, (err, validate) => {
+                if (err == null) {
+                    debug(`compiled ajv schema validator for schema.$id "${schema.original.id || schema.schemaId}"`);
+                    resolve(validate);
+                }
+                else if (_.endsWith(err.message, 'already exists')) {
+                    debug(`[error] compilation failed of schema [${this.schema.schemaId}] because of a race condition triggered when multiple ajv.compileAsync calls are triggered at the same time`);
+                    debug('you can solve the above race condition by making sure they are always called in sequence, and never in parralel');
+                    reject(err);
+                }
+                else {
+                    debug(`[error] compilation failed of schema [${this.schema.schemaId}]: ${err.message}`);
+                    reject(err);
+                }
+            }));
+    }
+
+    /**
+     * Promise that resolves once the schema is compiled.
+     */
+    public get compilation(): Promise<this> {
+        return this.compiledSchema.then(() => this);
     }
 
     /**
@@ -97,12 +125,12 @@ export class AjvSchemaValidator implements ISchemaValidator {
      * @return The result of the validation.
      */
     public validate<T>(item: T): Promise<ValidationResult> {
-        try {
-            return Promise.resolve(this.mapValidationResult(this.validator.validate(this.schema.schemaId, item), this.validator.errors));
-        }
-        catch (e) {
-            return Promise.reject(e);
-        }
+        return this.compiledSchema.then(validator =>
+            this.mapValidationResult(
+                //@todo use the compiled schema and calculate the subpath (this shuould be possible with the newer json schemas)
+                //validator(item, this.schema.propertyPrefix) as boolean,
+                this.validator.validate(this.schema.schemaId, item),
+                this.validator.errors));
     }
 
     /**
@@ -118,13 +146,12 @@ export class AjvSchemaValidator implements ISchemaValidator {
             return Promise.reject(new Error(`Invalid property name given "${propertyName}"`));
         }
 
-        try {
-            return Promise.resolve(this.mapValidationResult(
-                this.validator.validate(this.schema.fields[propertyName], value), this.validator.errors));
-        }
-        catch (e) {
-            return Promise.reject(e);
-        }
+        // @todo make this pointers instead of field names.
+        return this.compiledSchema.then(validator =>
+            this.mapValidationResult(
+                //validator(value, this.schema.getPropertyPointer(propertyName)) as boolean,
+                this.validator.validate(this.schema.fields[propertyName], value),
+                this.validator.errors));
     }
 
     /**
@@ -135,6 +162,7 @@ export class AjvSchemaValidator implements ISchemaValidator {
      * @return The result of the validation.
      */
     public validatePatchOperations<T>(ops: JsonPatchOperation[]): Promise<ValidationResult> {
+        //@todo validate dis
         return Promise.reject('Operation not supported.');
     }
 

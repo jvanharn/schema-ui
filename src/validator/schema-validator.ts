@@ -48,6 +48,16 @@ export interface ISchemaValidator {
 }
 
 /**
+ * Schema validator that requires compilation before it can be used, and exposes an additional "ready" event.
+ */
+export interface ICompiledSchemaValidator extends ISchemaValidator {
+    /**
+     * Promise that resolves once the schema is compiled.
+     */
+    compilation: Promise<this>;
+}
+
+/**
  * Struct used for returning validation results.
  */
 export interface ValidationResult {
