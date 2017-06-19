@@ -70,16 +70,16 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
     /**
      * The validator to help us validate incomming and outgoing requests before they are performed.
      */
-    public get validator(): ISchemaValidator {
+    public get validator(): Promise<ISchemaValidator> {
         if (this._validator == null) {
             this._validator = this.getValidator();
         }
         return this._validator;
     }
-    public set validator(validator: ISchemaValidator) {
+    public set validator(validator: Promise<ISchemaValidator>) {
         this._validator = validator;
     }
-    private _validator: ISchemaValidator;
+    private _validator: Promise<ISchemaValidator>;
 
     /**
      * Construct a new schema agent using a SchemaNavigator.
@@ -95,12 +95,12 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
         public readonly schema: SchemaNavigator,
         protected readonly cache: ISchemaCache,
         protected readonly fetcher: ISchemaFetcher,
-        validator?: ISchemaValidator,
+        validator?: ISchemaValidator | Promise<ISchemaValidator>,
         public readonly validators?: ValidatorCache,
         public readonly parent?: ISchemaAgent,
     ) {
         if (validator != null) {
-            this.validator = validator;
+            this.validator = Promise.resolve(validator);
         }
     }
 
@@ -122,14 +122,15 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
             .then(requestSchema => {
                 // Validate using the request schema (if applicable).
                 if (requestSchema != null) {
-                    if (!!this.validator && requestSchema.id && requestSchema.id === this.validator.schema.schemaId) {
+                    if (!!this.validator && requestSchema.id && requestSchema.id === this.schema.schemaId) {
                         // Validate using the agent validator
                         debug(`validate request against [${this.schema.root.id}] own schema`);
-                        return this.validator.validate(data);
+                        return this.validator.then(x => x.validate(data));
                     }
+
                     let validator = this.getValidator(new SchemaNavigator(requestSchema));
                     debug(`validate request against [${this.schema.root.id}].links.${link.rel}.requestSchema`);
-                    return validator.validate(data);
+                    return validator.then(x => x.validate(data));
                 }
             })
             .then(validation => {
@@ -470,11 +471,11 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
      *
      * @param schema (Optionally) the schema to validate for, if not the one associated with this agent.
      */
-    public getValidator(schema: SchemaNavigator = this.schema): ISchemaValidator {
+    public getValidator(schema: SchemaNavigator = this.schema): Promise<ISchemaValidator> {
         if (this.validators != null) {
             return this.validators.getValidator(this.schema);
         }
-        return new AjvSchemaValidator(this.schema, this.cache, this.fetcher);
+        return (new AjvSchemaValidator(this.schema, this.cache, this.fetcher)).compilation;
     }
 
     /**

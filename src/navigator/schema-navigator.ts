@@ -337,7 +337,7 @@ export class SchemaNavigator {
          * Get all fields in the form grouped by fieldsetid.
          */
         public get fieldsets(): FieldsetFieldMap {
-            return this.getFieldsetsFromPropertyRoot(this.propertyRoot as SchemaPropertyMap<JsonFormSchema>, '/', defaultFieldsetId, name => this.isFieldRequired('/' + name));
+            return this.getFieldsetsFromPropertyRoot(this.propertyRoot as SchemaPropertyMap<JsonFormSchema>, this.propertyPrefix, defaultFieldsetId, name => this.isFieldRequired(name));
         }
 
         /**
@@ -397,25 +397,11 @@ export class SchemaNavigator {
         /**
          * Check whether the field in this schema root is required.
          *
-         * @param fieldPath The field-name or -pointer of the field to check. Has to be returned by the fields property.
+         * @param name The field-name of the field to check. Has to be returned by the fields property.
          *
          * @return Whether or not the given field is required.
          */
         public isFieldRequired(name: string): boolean {
-            // var pieces = fieldPath.split('/').filter(x => !_.isEmpty(x)),
-            //     subPath = '/' + pieces.slice(0, pieces.length-2).join('/'),
-            //     applicable = getApplicablePropertyDefinitions(this.root, subPath, ref => this.getEmbeddedSchema(ref));
-
-            // for (var path of applicable) {
-            //     var subpieces = path.split('/'), requiredPath = '/' + subpieces.slice(0, subpieces.length - 2).join('/') + 'required';
-            //     try {
-            //         if (_.endsWith(subpieces[pieces.length-1].toLowerCase(), 'properties') && _.includes(pointer.get(this.root, requiredPath), _.last(pieces))) {
-            //             return true;
-            //         }
-            //     }
-            //     catch (e) { /* */ }
-            // }
-            // return false;
             if (this.hasPatternProperties()) {
                 if (this._patternRequiredPropertyCache == null) {
                     this.propertyRoot;

@@ -4,7 +4,7 @@ import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
 
 import { CommonFormats } from './common-formats';
-import { ISchemaValidator, ValidationError, ValidationResult } from './schema-validator';
+import { ISchemaValidator, ICompiledSchemaValidator, ValidationError, ValidationResult } from './schema-validator';
 
 import * as ajv from 'ajv';
 import * as _ from 'lodash';
@@ -15,7 +15,7 @@ var debug = debuglib('schema:validator:ajv');
 /**
  * Class that helps with the validation of a schema or it's properties.
  */
-export class AjvSchemaValidator implements ISchemaValidator {
+export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaValidator {
     /**
      * Formats globally registered.
      */
@@ -108,6 +108,13 @@ export class AjvSchemaValidator implements ISchemaValidator {
                     reject(err);
                 }
             }));
+    }
+
+    /**
+     * Promise that resolves once the schema is compiled.
+     */
+    public get compilation(): Promise<this> {
+        return this.compiledSchema.then(() => this);
     }
 
     /**
