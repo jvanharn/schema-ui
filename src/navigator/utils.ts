@@ -1,5 +1,7 @@
 import * as _ from 'lodash';
 import * as pointer from 'json-pointer';
+import * as debuglib from 'debug';
+var debug = debuglib('schema:utils');
 
 import { JsonSchema, CommonJsonSchema } from '../models/index';
 
@@ -127,4 +129,52 @@ export function getApplicablePropertyDefinitions(schema: JsonSchema, propertyPat
     //@todo support anyOf, allOf, local-$ref-erences, ...
 
     throw new Error(`Cannot find any way to navigate for path "${propertyPath}" and schema path "${schemaPathPrefix}"!`);
+}
+
+/**
+ * Resolve and merge the list of given schemaId refs (subpaths supported).
+ *
+ * @param schemas List of schema ids.
+ * @param resolver Method called to resolve the uri part of the url.
+ *
+ * @return Resolve and merge the given schemas.
+ */
+export function resolveAndMergeSchemas(schemas: string[], resolver: (id: string) => JsonSchema): JsonSchema {
+    return _
+        .partialRight(_.assignInWith, (a: any, b: any) => {
+            if (_.isObject(a) && _.isObject(b)) {
+                return _.assign(a, b);
+            }
+            else if (_.isArray(a) && _.isArray(b)) {
+                return _.concat(a, b);
+            }
+        })
+        .apply(_, _.map(schemas, x => {
+            try {
+                var [url, path] = x.split('#');
+                var schema = resolver(url + '#');
+                if (!schema) {
+                    throw new Error(`Unable to find the schema id ${url}.`);
+                }
+
+                if (path == null || path === '/' || path === '') {
+                    return schema;
+                }
+
+                let sub = pointer.get(schema, path);
+                if (!!sub && sub.$ref != null) {
+                    sub = resolver(sub.$ref);
+                }
+
+                if (!_.isObject(sub) || _.isEmpty(sub)) {
+                    throw new Error('The property root contained a $ref that pointed to a non-existing(at least not embedded) schema!');
+                }
+
+                return sub;
+            }
+            catch (e) {
+                debug(`[warn] unable to fetch the root on path "${x}":`, e);
+                return { };
+            }
+        }))
 }
