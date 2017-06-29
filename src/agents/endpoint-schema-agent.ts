@@ -9,6 +9,7 @@ import {
     EntityIdentity
 } from '../models/index';
 import { ISchemaAgent, SchemaAgentResponse, SchemaAgentRejection, HeaderDictionary } from './schema-agent';
+import { IRelatableSchemaAgent } from './relatable-schema-agent';
 import { IAuthenticatedSchemaAgent } from './authenticated-schema-agent';
 import { IAgentAuthenticator } from '../authenticators/agent-authenticator';
 import { ISchemaCache } from '../cache/schema-cache';
@@ -41,7 +42,7 @@ export const jsonPatchMimeType = 'application/json-patch';
  * This class makes it possible to read a json-schema and load the links that are defined in it.
  * Makes it easy to use the links used in json-schemas as outlined in the JSON-Schema Hyper schema extension.
  */
-export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
+export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent, IAuthenticatedSchemaAgent {
     /**
      * The default base url of new instances of the EndpointSchemaAgent.
      */
@@ -97,7 +98,7 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
         protected readonly fetcher: ISchemaFetcher,
         validator?: ISchemaValidator | Promise<ISchemaValidator>,
         public readonly validators?: ValidatorCache,
-        public readonly parent?: ISchemaAgent,
+        public readonly parent?: IRelatableSchemaAgent,
     ) {
         if (validator != null) {
             this.validator = Promise.resolve(validator);
@@ -465,6 +466,111 @@ export class EndpointSchemaAgent implements IAuthenticatedSchemaAgent {
 
         return last;
     }
+
+    //region IRelatableSchemaAgent
+        /**
+         * Creates a clone using the same dependencies but no set schema's.
+         */
+        protected createChild(json: JsonSchema, propertyPrefix?: string, parent: EndpointSchemaAgent = this): EndpointSchemaAgent {
+            var agent = new EndpointSchemaAgent(
+                new SchemaNavigator(json, propertyPrefix),
+                this.cache, this.fetcher, void 0, this.validators, parent);
+            agent.baseUrl = this.baseUrl;
+            agent.authenticator = this.authenticator;
+            return agent;
+        }
+
+        /**
+         * Creates a child agent for the given schema property.
+         *
+         * @param propertyName The name of the property to create the sub-schema for.
+         * @param propertyPath The path of the property in the json structure.
+         *
+         * @return A promise resolving in the new sub-agent.
+         */
+        public createChildByProperty(propertyPath: string): EndpointSchemaAgent;
+        public createChildByProperty(propertyName: string): EndpointSchemaAgent {
+            // Check if the given item is the field name or an JSON Pointer.
+            var path: string;
+            if (propertyName[0] === '/') {
+                path = propertyName;
+            }
+            else {
+                path = this.schema.getPropertyPointer(propertyName);
+            }
+
+            if (path == null) {
+                throw new Error('Unknown field, cannot create child agent.');
+            }
+
+            // Create the child agent.
+            return this.createChild(this.schema.original, path, this);
+        }
+
+        /**
+         * Creates child agent using the given schema reference.
+         *
+         * The implementation MAY check if it actually is a child/sibbling.
+         *
+         * @param schemaId The schema identity or schema reference of the schema that is a child of this one.
+         *
+         * @return A promise resolving in the new sub-agent.
+         */
+        public createChildByReference(ref: string): Promise<EndpointSchemaAgent> {
+            var linkedSchema: Promise<JsonSchema>, syncSchema: JsonSchema;
+            if ((syncSchema = this.schema.getEmbeddedSchema(ref)) != null) {
+                linkedSchema = Promise.resolve(syncSchema);
+            }
+            else if (!!this.cache && (syncSchema = this.cache.getSchema(ref)) != null) {
+                linkedSchema = Promise.resolve(syncSchema);
+            }
+            else if (!!this.fetcher) {
+                linkedSchema = this.fetcher.fetchSchema(ref).then(schema => {
+                    try {
+                        if (!!this.cache && this.cache.getSchema(ref) == null) {
+                            this.cache.setSchema(schema);
+                        }
+                    }
+                    catch (e) { /* */ }
+
+                    return schema;
+                });
+            }
+            else {
+                return Promise.reject(new Error('unable to resolve the target JsonSchema!'));
+            }
+
+            return linkedSchema.then(x => this.createChild(x, void 0));
+        }
+
+        /**
+         * Creates a sibbling/related schema using the current schema's resources.
+         *
+         * @param linkName The name of the link to resolve the schema for.
+         * @param urlData Any url/context -data to help with resolving if the agent tries to fetch the schema with an options call or similar.
+         *
+         * @return A promise resolving in the new sub-agent.
+         */
+        public createChildByLink(linkName: string, urlData?: IdentityValues): Promise<EndpointSchemaAgent> {
+            var schemaLink = this.schema.getLink(linkName);
+            if (schemaLink == null) {
+                throw new Error(`Unable to resolve the link with name "${linkName}" to be able to create a childSchema for it.`);
+            }
+
+            var linkedSchema: Promise<JsonSchema>;
+            if (!!schemaLink.targetSchema && !!schemaLink.targetSchema.$ref) {
+                return this.createChildByReference(schemaLink.targetSchema.$ref);
+            }
+            else if(!!schemaLink.targetSchema && !!schemaLink.targetSchema.id) {
+                linkedSchema = Promise.resolve(schemaLink.targetSchema);
+            }
+            else {
+                return Promise.reject('unable to resolve the target JsonSchema!');
+            }
+
+            return linkedSchema.then(x => this.createChild(x, void 0));
+        }
+    //endregion
 
     /**
      * Get a validator instance to use and validate the given schema navigator.

@@ -134,6 +134,8 @@ export function getApplicablePropertyDefinitions(schema: JsonSchema, propertyPat
 /**
  * Resolve and merge the list of given schemaId refs (subpaths supported).
  *
+ * This method just merges all types without prejudice. (Dumb merge)
+ *
  * @param schemas List of schema ids.
  * @param resolver Method called to resolve the uri part of the url.
  *
@@ -151,30 +153,77 @@ export function resolveAndMergeSchemas(schemas: string[], resolver: (id: string)
         })
         .apply(_, _.map(schemas, x => {
             try {
-                var [url, path] = x.split('#');
-                var schema = resolver(url + '#');
-                if (!schema) {
-                    throw new Error(`Unable to find the schema id ${url}.`);
-                }
-
-                if (path == null || path === '/' || path === '') {
-                    return schema;
-                }
-
-                let sub = pointer.get(schema, path);
-                if (!!sub && sub.$ref != null) {
-                    sub = resolver(sub.$ref);
-                }
-
-                if (!_.isObject(sub) || _.isEmpty(sub)) {
-                    throw new Error('The property root contained a $ref that pointed to a non-existing(at least not embedded) schema!');
-                }
-
-                return sub;
+                return resolveSchema(x, resolver);
             }
             catch (e) {
                 debug(`[warn] unable to fetch the root on path "${x}":`, e);
                 return { };
             }
         }))
+}
+
+/**
+ * Resolve and merge the list of given schemaId refs (subpaths supported).
+ *
+ * This method intelligently merges the given paths in such a way that there is an Schema for every valid type.
+ *
+ * @param schemas List of schema ids.
+ * @param resolver Method called to resolve the uri part of the url.
+ *
+ * @return Resolve and merge the given schemas.
+ */
+export function resolveAndMergeSchemasDistinct(schemas: string[], resolver: (id: string) => JsonSchema): JsonSchema[] {
+    var result: JsonSchema[] = [];
+    for (var id of schemas) {
+        var schema = resolveSchema(id, resolver);
+        if (isAllOfSubSchema(id)) {
+            var existing = _.findIndex(result, x => x.type === schema.type);
+            if (existing >= 0) {
+                if (_.isArray(result[existing]) && _.isArray(schema)) {
+                    result[existing] = _.concat(result[existing] as JsonSchema[], schema);
+                    continue;
+                }
+                else if (_.isObject(result[existing]) && _.isObject(schema)) {
+                    result[existing] = _.assign({}, result[existing], schema);
+                    continue;
+                }
+                else {
+                    debug(`unable to merge two schema definitions`);
+                }
+            }
+        }
+        result.push(schema);
+    }
+    return result;
+}
+
+/**
+ * Resolve the given schema id and any subschema's.
+ */
+export function resolveSchema(schemaId: string, resolver: (id: string) => JsonSchema): JsonSchema {
+    var [url, path] = schemaId.split('#');
+    var schema = resolver(url + '#');
+    if (!schema) {
+        throw new Error(`Unable to find the schema id ${url}.`);
+    }
+
+    if (path == null || path === '/' || path === '') {
+        return schema;
+    }
+
+    let sub = pointer.get(schema, path);
+    if (!!sub && sub.$ref != null) {
+        sub = resolver(sub.$ref);
+    }
+
+    if (!_.isObject(sub) || _.isEmpty(sub)) {
+        throw new Error('The property root contained a $ref that pointed to a non-existing(at least not embedded) schema!');
+    }
+
+    return sub;
+}
+
+export function isAllOfSubSchema(schemaId: string): boolean {
+    var splitup = _.last(schemaId.split('#')).split('/');
+    return splitup[splitup.length-2] === 'allOf';
 }
