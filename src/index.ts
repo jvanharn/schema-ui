@@ -25,5 +25,6 @@ export * from './authenticators/basic-agent-authenticator';
 export * from './authenticators/jwt-agent-authenticator';
 
 export * from './agents/schema-agent';
+export * from './agents/relatable-schema-agent';
 export * from './agents/authenticated-schema-agent';
 export * from './agents/endpoint-schema-agent';

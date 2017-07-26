@@ -13,7 +13,7 @@ export function fixJsonPointerPath(path: string, leadingSlash: boolean = false):
         return leadingSlash ? '/' : '';
     }
 
-    if (path.substr(0, 4) === 'http') {
+    if (path.indexOf('://') >= 0 || path.indexOf('#') >= 0) {
         var [url, path] = path.split('#');
         return url + '#' + fixJsonPointerPath(path, leadingSlash);
     }
