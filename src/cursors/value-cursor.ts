@@ -450,10 +450,24 @@ export function sortCollectionBy<T>(collection: T[], sorters: CollectionSortDesc
  */
 export function filterCollectionBy<T>(collection: T[], filters: CollectionFilterDescriptor[]): T[] {
     return _.filter(collection, x => _.every(filters, f => {
+        if (f.path === '*') {
+            return _.some(_.toPairs(x), ([k, v]) => {
+                try {
+                    return applyFilter({
+                        path: '/' + k,
+                        operator: f.operator,
+                        value: f.value
+                    }, v);
+                } catch (e) {
+                    return false;
+                }
+            });
+        }
+
         try {
             return applyFilter(f, pointer.get(x, f.path))
-        } catch(e) {
-            return true;
+        } catch (e) {
+            return false;
         }
     }));
 }
@@ -462,6 +476,9 @@ export function filterCollectionBy<T>(collection: T[], filters: CollectionFilter
  * Apply filter to value.
  */
 function applyFilter(filter: CollectionFilterDescriptor, val: any): boolean {
+    if (_.isString(filter.operator)) {
+        filter.operator = parseInt(filter.operator, 10);
+    }
     switch (filter.operator) {
         case CollectionFilterOperator.Contains:
             return String(val).toLowerCase()
