@@ -1,13 +1,13 @@
 {
   "name": "json-schema-services",
-  "version": "0.5.6",
+  "version": "0.5.9",
   "description": "Library that makes it easy to work with JsonSchema-enabled services. Requires Promises (polyfill with es6-promise if not available on your platform).",
   "main": "esm/index.js",
   "module": "esm/index.js",
   "typings": "esm/index.d.ts",
   "scripts": {
     "test": "cd tests; jasmine",
-    "build": "rm -rf esm/ && tsc"
+    "build": "rimraf esm/ && tsc"
   },
   "files": [
     "esm/**/*",
@@ -30,5 +30,9 @@
     "lodash": "^4.17.4",
     "qs": "^6.4.0",
     "url-template": "^2.0.8"
+  },
+  "devDependencies": {
+    "rimraf": "^2.6.1",
+    "typescript": "2.4.x"
   }
 }

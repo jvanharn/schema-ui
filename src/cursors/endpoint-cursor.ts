@@ -11,7 +11,7 @@ import { EndpointSchemaAgent } from '../agents/endpoint-schema-agent';
 import { EventEmitter } from 'eventemitter3';
 import * as _ from 'lodash';
 import * as debuglib from 'debug';
-var debug = debuglib('schema:endpoint:cursor');
+var debug = debuglib('schema:cursor:endpoint');
 
 /**
  * Cursor that can traverse standardized endpoints.
