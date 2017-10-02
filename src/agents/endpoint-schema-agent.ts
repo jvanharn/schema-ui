@@ -138,7 +138,7 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
                 // Check validation
                 if (validation != null && !validation.valid) {
                     debug(`[error] request validation failed against [${this.schema.root.id}].links.${link.rel}.requestSchema: `, validation.errors);
-                    throw new ValidationError(`Unable to send the message using link "${link.rel}", the request-body was not formatted correctly according to the request-schema included in the link definition.`, validation.errors);
+                    throw new AgentValidationError(`Unable to send the message using link "${link.rel}", the request-body was not formatted correctly according to the request-schema included in the link definition.`, validation.errors);
                 }
 
                 // Get the headers
@@ -656,8 +656,8 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
 /**
  * Error thrown when the call doesnt validate.
  */
-class ValidationError extends Error {
-    public name: string = 'ValidationError';
+export class AgentValidationError extends Error {
+    public name: string = 'AgentValidationError';
     public code: number = 400;
     public headers: HeaderDictionary = null;
     public token: string = 'INVALID_ENTITY_DOCUMENT';
@@ -669,7 +669,7 @@ class ValidationError extends Error {
         this.data = validationErrors;
 
         // Set the prototype explicitly.
-        (Object as any).setPrototypeOf(this, ValidationError.prototype);
+        (Object as any).setPrototypeOf(this, AgentValidationError.prototype);
     }
 }
 

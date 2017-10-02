@@ -502,7 +502,7 @@ export class SchemaNavigator {
             if (_.isArray(this.root.links)) {
                 lnk = lnk.concat(this.root.links);
             }
-            if (_.isArray(this.schema.links)) {
+            if (_.isArray(this.schema.links) && this.schema.links !== this.root.links) {
                 lnk = lnk.concat(this.schema.links);
             }
             return lnk;

@@ -8,7 +8,7 @@
         "preserveConstEnums": true,
         "declaration": true,
         "sourceMap": true,
-        "lib": ["es5", "es2015.promise"],
+        "lib": ["es5", "es2015.promise", "es2015.core"],
         "outDir": "esm",
         "rootDir": "src"
     },

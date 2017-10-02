@@ -111,7 +111,7 @@ export function getApplicablePropertyDefinitions(schema: JsonSchema, propertyPat
     else if (schema.type === 'array') {
         if (_.isObject(schema.items)) {
             return getApplicablePropertyDefinitions(
-                schema.items,
+                schema.items as any,
                 '/' + cleaned.slice(1).join('/'),
                 referenceResolver,
                 schemaPathPrefix + '/items');
@@ -172,12 +172,12 @@ export function resolveAndMergeSchemas(schemas: string[], resolver: (id: string)
  *
  * @return Resolve and merge the given schemas.
  */
-export function resolveAndMergeSchemasDistinct(schemas: string[], resolver: (id: string) => JsonSchema): JsonSchema[] {
-    var result: JsonSchema[] = [];
+export function resolveAndMergeSchemasDistinct(schemas: string[], resolver: (id: string) => JsonSchema): (JsonSchema | JsonSchema[])[] {
+    var result: (JsonSchema | JsonSchema[])[] = [];
     for (var id of schemas) {
         var schema = resolveSchema(id, resolver);
         if (isAllOfSubSchema(id)) {
-            var existing = _.findIndex(result, x => x.type === schema.type);
+            var existing = _.findIndex(result, x => (x as JsonSchema).type === schema.type);
             if (existing >= 0) {
                 if (_.isArray(result[existing]) && _.isArray(schema)) {
                     result[existing] = _.concat(result[existing] as JsonSchema[], schema);
