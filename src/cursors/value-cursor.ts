@@ -110,7 +110,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
          * Set and get the columns for the cursor and set primaries
          */
         public get columns(): SchemaColumnDescriptor[] {
-            if (this.columns == null) {
+            if (this._columns == null) {
                 return this.schema.columns;
             }
             return this._columns;
