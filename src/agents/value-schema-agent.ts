@@ -16,8 +16,8 @@ import { IAgentAuthenticator } from '../authenticators/agent-authenticator';
 import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
 import { ICursor } from '../cursors/cursor';
-import { CollectionFilterDescriptor } from '../cursors/filterable-cursor';
-import { CollectionSortDescriptor } from '../cursors/sortable-cursor';
+import { CollectionFilterDescriptor, getSanitizedFilters } from '../cursors/filterable-cursor';
+import { CollectionSortDescriptor, getSanitizedSorters } from '../cursors/sortable-cursor';
 import { ValueCursor } from '../cursors/value-cursor';
 
 import { SchemaNavigator } from '../navigator/schema-navigator';
@@ -152,9 +152,27 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
                     case 'GET':
                         if (link.rel.startsWith('list')) {
                             let listPage = urlData ? parseInt(urlData['page'] as any, 10) : 1,
-                                listLimit = urlData ? parseInt(urlData['limit'] as any, 10) : void 0;
-                            return this.list(listPage, listLimit)
-                                .then(c => c.items)
+                                listLimit = urlData ? parseInt(urlData['limit'] as any, 10) : void 0,
+                                listFilters: CollectionFilterDescriptor[] = [],
+                                listSorters: CollectionSortDescriptor[] = [];
+                            if (data && (data as any).page) {
+                                listPage = (data as any).page;
+                            }
+                            if (data && (data as any).limit) {
+                                listLimit = (data as any).limit;
+                            }
+                            if (data && (data as any).filters) {
+                                listFilters = getSanitizedFilters(data);
+                            }
+                            if (data && (data as any).sorters) {
+                                listSorters = getSanitizedSorters(data);
+                            }
+                            return this.list<any>(null, listLimit, link.rel, urlData)
+                                .then((cursor: ValueCursor<any>) => {
+                                    cursor.filterBy(listFilters, true);
+                                    cursor.sortBy(listSorters, true);
+                                    return cursor.select(listPage);
+                                })
                                 .then(x => ({
                                     code: 200,
                                     headers: {},
@@ -309,16 +327,6 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
      * @return A promise resolving into the requested cursor.
      */
     public list<TItem>(page?: number, limit?: number, linkName?: string, urlData?: IdentityValues): Promise<ICursor<TItem>> {
-        // Try to fetch the link name
-        let link = this.chooseAppropriateLink([
-            'list',
-            'collection',
-            'search'
-        ], linkName);
-        if (!link) {
-            return Promise.reject(`Couldn't find a usable schema hyperlink name to read with.`);
-        }
-
         var cursor = new ValueCursor<TItem>(this.schema, this._wrapped as any, page);
         cursor.limit = limit;
         return Promise.resolve(cursor);
