@@ -10,6 +10,7 @@ import {
     JsonTableSchema,
     CommonJsonSchema,
     SchemaPropertyMap,
+    SchemaDataPointerMap,
 
     IdentityValue,
     IdentityValues,
@@ -39,11 +40,6 @@ export class SchemaNavigator {
      * Cache where a list of resolved schemaids to properties is saved into.
      */
     protected schemaIdPointerMap: { [schemaId: string]: string };
-
-    /**
-     * Cache where a list of propertyRoot properties is mapped to their schema json pointers.
-     */
-    protected propertyRootSchemaPointerMap: { [property: string]: string[] };
 
     /**
      * A list of all the definitions that apply to the given propertyPrefix.
@@ -195,6 +191,8 @@ export class SchemaNavigator {
         /**
          * Get all schema properties.
          *
+         * @warn This only works if the given relative root path points to an schema of type "object"!
+         *
          * @return Dictionary of property names and their JsonSchemas.
          */
         public get propertyRoot(): SchemaPropertyMap<JsonSchema> {
@@ -202,71 +200,25 @@ export class SchemaNavigator {
                 return this._propertyRoot;
             }
 
-            return this._propertyRoot = this.findPropertiesMap(this.root);
-        }
-
-        /**
-         * Takes an schema and finds the schema properties object.
-         */
-        protected findPropertiesMap(schema: JsonSchema, schemaPathPrefix: string = ''): SchemaPropertyMap<JsonSchema> {
-            if (this.hasPatternProperties(schema)) {
-                return this.findPatternPropertiesMap(schema, schemaPathPrefix);
+            if (this.hasPatternProperties(this.root)) {
+                debug(
+                    'unable to find the propertyRoot for an schema where the root does not point to a schema of type object.\n' +
+                    'Try setting the schemaRootPrefix to the pattern sub property that contains the root of the form to be generated.');
+                return this._propertyRoot = { };
             }
-            else if (schema.type === 'object') {
-                if (!this.propertyRootSchemaPointerMap) {
-                    this.createPropertyRootCache(schemaPathPrefix + 'properties', schema.properties);
-                }
-
-                return schema.properties;
+            else if (this.root.type === 'object') {
+                return this._propertyRoot = this.root.properties;
             }
-            // @warn this does not work, because the path prefix should already include an array-index in order to make this work.
-            // @warn if we enable this, it is complete guess work what array index we are working with.
-            // @warn if anyone ever demands this feature you would have to refactor this method to also add the "/0" index to the getPropertyPointer function.
-            // else if (schema.type === 'array' && !_.isArray(schema.items as JsonSchema)) {
-            //     if ((schema.items as JsonSchema).$ref != null) {
-            //         return this.findPropertiesMap(this.getEmbeddedSchema((schema.items as JsonSchema).$ref), schemaPathPrefix + 'items/');
-            //     }
-
-            //     return this.findPropertiesMap(schema.items as JsonSchema, schemaPathPrefix + 'items/');
-            // }
+            else if (this.root.type === 'array') {
+                debug(
+                    'unable to find the propertyRoot for an schema where the root does not point to a schema of type object.\n' +
+                    'Try setting the schemaRootPrefix to the sub index that contains the form you want to render.');
+                return this._propertyRoot = { };
+            }
             else {
-                return { };
+                debug(`unable to find the schema propertyRoot, defaulting to an empty object.`);
+                return this._propertyRoot = { };
             }
-        }
-
-        /**
-         * Builds the cache of (required) pattern properties
-         */
-        private findPatternPropertiesMap(schema: JsonSchema, schemaPathPrefix: string = ''): SchemaPropertyMap<JsonSchema> {
-            var properties = { };
-
-            // begin with any regular properties, if they are set
-            if (_.isPlainObject(schema.properties) && _.size(schema.properties) > 0) {
-                properties = _.assign({}, schema.properties) as SchemaPropertyMap<JsonSchema>;
-
-                this.createPropertyRootCache(schemaPathPrefix + 'properties', schema.properties);
-            }
-            this._patternRequiredPropertyCache = [];
-
-            var parts = this.propertyPrefix.split('/'),
-                matchable = !!parts && !!parts[1] ? String(parts[1]) : '';
-            if (matchable.length === 0) {
-                debug(`[warn] propertyRoot is matching on an empty first property root path (${this.propertyPrefix}), so this will probably cause unexpected behaviour.`);
-            }
-
-            _.each(schema.patternProperties, (schema: JsonSchema, pattern: string) => {
-                if (matchable.search(pattern) >= 0) {
-                    properties = _.assign(properties, schema.properties) as SchemaPropertyMap<JsonSchema>;
-
-                    this.createPropertyRootCache(schemaPathPrefix + `patternProperties/${pattern}/properties`, schema.properties);
-
-                    if (_.isArray(schema.required)) {
-                        this._patternRequiredPropertyCache.push(...schema.required);
-                    }
-                }
-            });
-
-            return properties;
         }
 
         /**
@@ -281,18 +233,18 @@ export class SchemaNavigator {
         /**
          * Finds the main form property list and returns the ones that qualify as visible fields.
          *
-         * @return An dictionary of all visible fields in thi JsonFormSchema.
+         * @return An dictionary of all visible fields in this JsonFormSchema.
          */
-        public get fields(): SchemaPropertyMap<JsonFormSchema> {
+        public get fields(): SchemaDataPointerMap<JsonFormSchema> {
             let props = this.propertyRoot,
-                fields: SchemaPropertyMap<JsonFormSchema> = { };
+                fields: SchemaDataPointerMap<JsonFormSchema> = { };
             for (let key in props) {
                 if (!props.hasOwnProperty(key)) {
                     continue;
                 }
 
                 if (this.qualifiesAsFormField(props[key] as JsonFormSchema)) {
-                    fields[key] = props[key] as JsonFormSchema;
+                    fields[this.propertyPrefix + key] = props[key] as JsonFormSchema;
                 }
             }
             return fields;
@@ -309,7 +261,7 @@ export class SchemaNavigator {
          * Checks whether the given schema qualifies as a subschema/fieldset.
          */
         private qualifiesAsSubform(field: JsonFormSchema): boolean {
-            return field.type === 'object' && _.isObject(field.properties);
+            return field.type === 'object' && _.isObject(field.properties) && !this.hasPatternProperties(field);
         }
 
         /**
@@ -389,13 +341,13 @@ export class SchemaNavigator {
          * If the language code is not given, english is returned.
          * If the schema is a draft-4 formatted title (no multilang), then the value is considered english.
          *
-         * @param name The name of the property/field.
+         * @param pointer The pointer to the property/field in the data.
          * @param language The language code to fetch the title for (optional).
          *
          * @return The title for the given field, for the given language or null if not available for the given language.
          */
-        public getFieldTitle(name: string, language: string = 'en'): string | null {
-            return this.getFieldTranslatableMessage(name, 'title', language);
+        public getFieldTitle(pointer: string, language: string = 'en'): string | null {
+            return this.getFieldTranslatableMessage(pointer, 'title', language);
         }
 
         /**
@@ -404,13 +356,13 @@ export class SchemaNavigator {
          * If the language code is not given, english is returned.
          * If the schema is a draft-4 formatted description (no multilang), then the value is considered english.
          *
-         * @param name The name of the property/field.
+         * @param pointer The pointer to the property/field in the data.
          * @param language The language code to fetch the title for (optional).
          *
          * @return The description for the given field, for the given language or null if not available for the given language.
          */
-        public getFieldDescription(name: string, language: string = 'en'): string | null {
-            return this.getFieldTranslatableMessage(name, 'description', language);
+        public getFieldDescription(pointer: string, language: string = 'en'): string | null {
+            return this.getFieldTranslatableMessage(pointer, 'description', language);
         }
 
         /**
@@ -419,18 +371,24 @@ export class SchemaNavigator {
          * If the language code is not given, english is returned.
          * If the schema is a draft-4 formatted title (no multilang), then the value is considered english.
          *
-         * @param name The name of the property/field.
+         * @param pointer The pointer to the property/field in the data.
          * @param messageType The property that contains the translatable string(s).
          * @param language The language code to fetch the title for (optional).
          *
          * @return The title for the given field, for the given language or null if not available for the given language.
          */
-        private getFieldTranslatableMessage(name: string, messageType: string, language: string = 'en'): string | null {
-            if (this.fields[name] == null || _.isEmpty((<any> this.fields[name])[messageType])) {
+        private getFieldTranslatableMessage(pointer: string, messageType: string, language: string = 'en'): string | null {
+            if (pointer == null || pointer === '') {
                 return null;
             }
 
-            let translatable: string | SchemaTranslatableStringMap = (<any> this.fields[name])[messageType];
+            pointer = fixJsonPointerPath(pointer);
+
+            if (this.fields[pointer] == null || _.isEmpty((<any> this.fields[pointer])[messageType])) {
+                return null;
+            }
+
+            let translatable: string | SchemaTranslatableStringMap = (<any> this.fields[pointer])[messageType];
             if (_.isString(translatable)) {
                 return _.startsWith(language, 'en') ? translatable as string : null;
             }
@@ -614,19 +572,6 @@ export class SchemaNavigator {
         }
 
         /**
-         * Get the property schema pointers.
-         *
-         * Get the JSON Pointer pointing to the given field property schema/descriptor in this schema
-         *
-         * @param name The name of the property to get the pointer to.
-         *
-         * @return The pointers to the given property schema.
-         */
-        public getPropertySchemaPointer(name: string): string[] {
-            return this.propertyRootSchemaPointerMap[String(name).toLowerCase()];
-        }
-
-        /**
          * Get the identity value for the given data.
          *
          * @param data The data to fetch the identity property value from.
@@ -686,20 +631,6 @@ export class SchemaNavigator {
                 this.setIdentityValues(data, this.getPropertyValue(prop, identities));
             }
             return data;
-        }
-
-        /**
-         * Creates a cache with properties and how to access them in the schema.
-         */
-        protected createPropertyRootCache(basePath: string, obj: { [key: string]: any }): void {
-            if (!this.propertyRootSchemaPointerMap) {
-                this.propertyRootSchemaPointerMap = { };
-            }
-
-            _.each(obj, (val, key) =>
-                this.propertyRootSchemaPointerMap[key.toLowerCase()] =
-                    _.map(this.propertyDefinitionRoots, x =>
-                        fixJsonPointerPath(_.last(x.split('#'))) + fixJsonPointerPath(basePath, true) + key));
         }
     //endregion
 
@@ -856,6 +787,8 @@ export class SchemaNavigator {
 
     /**
      * Helper function for {@see getSchemaIdsWithPointer()}.
+     *
+     * Traverses over all unique schemaIds within the current schema.
      */
     private traverseSchemaDefinitions(schema: JsonSchema, iterator: (id: string, pointer: string) => void, reductor: string = '/'): void {
         if (!schema.definitions) {

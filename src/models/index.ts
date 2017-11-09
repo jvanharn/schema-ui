@@ -4,6 +4,7 @@ export {
     SchemaMediaDescriptor,
     SchemaDefinitionMap,
     SchemaPropertyMap,
+    SchemaDataPointerMap,
     SchemaPatternPropertyMap,
     SchemaTranslatableString,
     SchemaTranslatableStringMap

@@ -278,9 +278,14 @@ export interface SchemaHyperlinkDescriptor {
 export type SchemaDefinitionMap<T extends JsonSchema> = { [name: string]: T; };
 
 /**
- * Map/dictionary containing property names and a sub-schema.
+ * Map/dictionary containing property names that to a sub-schema.
  */
 export type SchemaPropertyMap<T extends JsonSchema> = { [property: string]: T; };
+
+/**
+ * Map/dictionary containing schemas with json-pointers as keys that point to the data as described by the parent schema.
+ */
+export type SchemaDataPointerMap<T extends JsonSchema> = { [dataPointer: string]: T; };
 
 /**
  * Map/dictionary of properties that use regex as the index.
