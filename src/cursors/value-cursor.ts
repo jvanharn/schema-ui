@@ -179,12 +179,14 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
 
     /**
      * @param _wrapped The wrapped collection.
+     * @param copyOnSelect Whether or not to copy objects when selecting.
      */
     public constructor(
         public readonly schema: SchemaNavigator,
         private _wrapped: T[],
         intialPage: number | null,
         columns?: SchemaColumnDescriptor[],
+        public copyOnSelect: boolean = true
     ) {
         super();
         this._count = _wrapped.length;
@@ -281,6 +283,11 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         var startIndex = (pageNumber - 1) * this.limit;
         var endIndex = pageNumber * this.limit;
         this._items = _.slice(this._items, startIndex, endIndex);
+
+        // Copy objects if needed
+        if (this.copyOnSelect && _.isObject(_.first(this._items))) {
+            this._items = this._items.map(x => _.assign({}, x));
+        }
 
         // Set cursor state
         this._current = pageNumber;

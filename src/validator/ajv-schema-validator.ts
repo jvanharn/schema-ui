@@ -58,7 +58,15 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
                                 debug('[warn] error ocurred whilst calling callback off requested ajv-schema, ironically: ', e);
                             }
                         })
-                        .catch(e => cb(e, void 0)),
+                        .catch(e => {
+                            // Just in case the callback doesnt exist
+                            try {
+                                cb(e, void 0);
+                            }
+                            catch (e) {
+                                debug('[warn] error ocurred whilst calling callback during error handling off requested ajv-schema, ironically: ', e);
+                            }
+                        }),
                 inlineRefs: false
             } as ajv.Options, options));
 

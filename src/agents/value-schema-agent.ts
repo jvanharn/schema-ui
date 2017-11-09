@@ -282,7 +282,13 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
         }
 
         // Find the item
-        return Promise.resolve(_.find(this._wrapped, this.itemMatcher(identity)));
+        var item = _.find(this._wrapped, this.itemMatcher(identity));
+        if (_.isObject(item)) {
+            item = _.assign({}, item);
+        }
+
+        // Resolve
+        return Promise.resolve(item);
     }
 
     /**
