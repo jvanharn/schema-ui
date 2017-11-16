@@ -48,12 +48,15 @@ export class SchemaNavigator {
 
     /**
      * Construct a new schema navigator.
+     *
      * @param schema The schema to wrap as navigable.
      * @param propertyPrefix The json-pointer that is used to prefix the area this navigator will look in with it's methods. (Defines the schema root)
+     * @param schemaReferenceResolver User method that optionally resolves references in the schema, to calculate schema roots etc.
      */
     public constructor(
         protected readonly schema: JsonSchema | JsonFormSchema | JsonTableSchema,
         public readonly propertyPrefix: string = '/',
+        protected readonly schemaReferenceResolver?: (ref: string) => JsonSchema,
     ) {
         if (this.schema == null) {
             debug('[warn] tried to create navigable-schema with empty schema');
@@ -64,7 +67,7 @@ export class SchemaNavigator {
         this.propertyPrefix = fixJsonPointerPath(propertyPrefix, true);
 
         // Determine the property definition root(s).
-        this.propertyDefinitionRoots = getApplicablePropertyDefinitions(this.schema, this.propertyPrefix, ref => this.getEmbeddedSchema(ref));
+        this.propertyDefinitionRoots = getApplicablePropertyDefinitions(this.schema, this.propertyPrefix, this.getSchema.bind(this));
 
         // Make sure this schema has an id set (otherwise we wont accept it)
         if (this.schemaId == null) {
@@ -634,6 +637,26 @@ export class SchemaNavigator {
         }
     //endregion
 
+    //region Pointer Field Operators
+        /**
+         * Get the Json (form) schema for the property-pointer in the result data.
+         *
+         * @param dataPointer Schema root-relative pointer that points to the property in the described object, to get the schema for.
+         *
+         * @return The json-schema.
+         */
+        public getFieldDescriptorForPointer(dataPointer: string): JsonFormSchema[] {
+            try {
+                var schemas = getApplicablePropertyDefinitions(this.root, dataPointer, this.getSchema.bind(this));
+                return schemas.map(p => pointer.get(this.root, p));
+            }
+            catch (err) {
+                debug(`getFieldDescriptorForPointer: retrieving the field descriptor resulted in an error: `, err);
+                return [];
+            }
+        }
+    //endregion
+
     /**
      * Whether or not the schema has patterned properties in it's root.
      */
@@ -691,6 +714,26 @@ export class SchemaNavigator {
         }
 
         return pointer.get(this.schema, fixJsonPointerPath(sp));
+    }
+
+    /**
+     * Get an embedded schema or try to fetch the schema using the user supplied method on construction of the navigator.
+     *
+     * @param schemaId The schema id to retrieve.
+     *
+     * @return The JsonSchema or null if it could not be found.
+     */
+    public getSchema(schemaId: string): JsonSchema | null {
+        var embedded = this.getEmbeddedSchema(schemaId);
+        if (embedded != null) {
+            return embedded;
+        }
+
+        if (this.schemaReferenceResolver) {
+            return this.schemaReferenceResolver(schemaId);
+        }
+
+        return null;
     }
 
     /**
