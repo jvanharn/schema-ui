@@ -648,7 +648,25 @@ export class SchemaNavigator {
         public getFieldDescriptorForPointer(dataPointer: string): JsonFormSchema[] {
             try {
                 var schemas = getApplicablePropertyDefinitions(this.root, dataPointer, this.getSchema.bind(this));
-                return schemas.map(p => pointer.get(this.root, p));
+                return schemas.map(p => {
+                    var splitter = p.indexOf('#');
+                    if (splitter === -1) {
+                        return pointer.get(this.root, p);
+                    }
+
+                    var [subId, subPoint] = p.split('#');
+                    if (subId + '#' === this.schemaId) {
+                        return pointer.get(this.root, subPoint);
+                    }
+
+                    var subSchema = this.getSchema(subId + '#');
+                    if (subSchema != null) {
+                        return pointer.get(subSchema, subPoint);
+                    }
+
+                    debug(`getFieldDescriptorForPointer: unable to find/retrieve the schema with id "${subId}#"`);
+                    return null;
+                }).filter(x => x != null);
             }
             catch (err) {
                 debug(`getFieldDescriptorForPointer: retrieving the field descriptor resulted in an error: `, err);
