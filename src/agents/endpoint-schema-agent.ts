@@ -680,7 +680,18 @@ export class AgentValidationError extends Error {
  * @throws SchemaAgentRejection
  */
 export function mapAxiosErrorToSchemaAgentRejection(error: any): never {
-    if (!error.response) {
+    if (!error.request && !error.response) {
+        throw error;
+    }
+    else if (!error.response) {
+        if (error.message === 'Network Error') {
+            throw {
+                code: 598,
+                headers: {},
+                token: 'NETWORK_ERROR',
+                data: void 0
+            } as SchemaAgentRejection;
+        }
         throw error;
     }
 
