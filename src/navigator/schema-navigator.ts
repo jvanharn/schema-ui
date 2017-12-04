@@ -32,6 +32,8 @@ import {
  */
 export const defaultFieldsetId = 'default';
 
+export const linkUriTemplateRegexp = /[^{\}]+(?=})/g;
+
 /**
  * Helper object for retrieving information from json-schema's.
  */
@@ -154,6 +156,13 @@ export class SchemaNavigator {
         }
 
         /**
+         * JSON-Pointer to the document identity value.
+         */
+        public get identityPointer(): string {
+            return this.propertyPrefix + this.identityProperty;
+        }
+
+        /**
          * Get's a list of all identity-like properties in the document. (Not only the main one)
          */
         public get identityProperties(): string[] {
@@ -165,6 +174,14 @@ export class SchemaNavigator {
                 }
             }
             return identities;
+        }
+
+        /**
+         * JSON-Pointers pointing to all the identity values in the document.
+         */
+        public get identityPointers(): string[] {
+            // @todo Do a recurse loop over all properties in the document and save the results.
+            return this.identityProperties.map(x => `/${x}`);
         }
     //endregion
 
@@ -531,6 +548,27 @@ export class SchemaNavigator {
             }
             return result;
         }
+
+        /**
+         * Get a mapping of uri keys to object pointers.
+         *
+         * @param link
+         */
+        public getLinkUriTemplatePointers(link: SchemaHyperlinkDescriptor): { [key: string]: string } {
+            if ((link as any).templatePointers) {
+                return (link as any).templatePointers;
+            }
+
+            var keys = link.href.match(linkUriTemplateRegexp);
+            if (keys == null) {
+                return {};
+            }
+
+            return _.fromPairs(keys.map(x => {
+                var key = x.replace(/[+#./;?&]/, '');
+                return [key, this.propertyPrefix + key] as [string, string];
+            }));
+        }
     //endregion
 
     //region JSON-Pointer helpers
@@ -582,7 +620,12 @@ export class SchemaNavigator {
          * @return The identity property value.
          */
         public getIdentityValue(data: any): IdentityValue {
-            return this.getPropertyValue(this.identityProperty, data);
+            try {
+                return pointer.get(data, this.identityPointer);
+            }
+            catch (e) {
+                return pointer.get(data, this.identityPointer.substr(this.propertyPrefix.length));
+            }
         }
 
         /**
