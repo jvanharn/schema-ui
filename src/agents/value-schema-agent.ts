@@ -63,6 +63,16 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
     }
 
     /**
+     * The largest identity number currently in the collection.
+     */
+    private identitySerial: number = 1;
+
+    /**
+     * Schema of the identity property.
+     */
+    private identitySchema: JsonSchema;
+
+    /**
      * Construct a new schema agent using a SchemaNavigator.
      *
      * @param schema The schema-navigator used to easily extract link information from the schema.
@@ -82,6 +92,20 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
     ) {
         if (validator != null) {
             this.validator = Promise.resolve(validator);
+        }
+
+        // Get the identity schema
+        this.identitySchema = _.first(this.schema.getFieldDescriptorForPointer(this.schema.identityPointer));
+
+        // Update the serial
+        if (_wrapped != null && _wrapped.length > 0 && this.identitySchema && (this.identitySchema.type === 'integer' || this.identitySchema.type === 'number')) {
+            try {
+                this.identitySerial = schema.getIdentityValue(_.maxBy(_wrapped, x => schema.getIdentityValue(x))) as number + 1;
+            }
+            catch (e) {
+                debug(`unable to determine the maximum primary key value, therefore initialized the identity serial to a random number`);
+                this.identitySerial = Math.floor(Math.random() * 1000) + 100;
+            }
         }
     }
 
@@ -246,6 +270,17 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
                     throw new AgentValidationError(`Unable to send the message using link "${link.rel}", the request-body was not formatted correctly according to the request-schema included in the link definition.`, validation.errors);
                 }
 
+                // Generate identity if required.
+                try {
+                    if (item && this.schema.getIdentityValue(item) == null) {
+                        this.schema.setIdentityValue(item, this.generateIdentity());
+                    }
+                }
+                catch (e) {
+                    this.schema.setIdentityValue(item, this.generateIdentity());
+                }
+
+                // Add the item.
                 this._wrapped.push(item as any);
                 debug(`created [${this.schema.root.id}].links.${link.rel}`);
 
@@ -436,6 +471,21 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
             return this.validators.getValidator(this.schema);
         }
         return (new AjvSchemaValidator(this.schema, this.cache, this.fetcher)).compilation;
+    }
+
+    /**
+     * Get the next identity values for this agent.
+     */
+    public generateIdentity(): IdentityValue {
+        switch (this.identitySchema.type) {
+            case 'string':
+                return Math.random().toString(36).substring(this.identitySchema.maxLength || this.identitySchema.maxLength || 26);
+            case 'integer':
+            case 'number':
+                return this.identitySerial++;
+            default:
+                throw new Error('Unable to generate an identity value for the current schema.');
+        }
     }
 
     /**
