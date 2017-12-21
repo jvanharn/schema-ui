@@ -1,4 +1,4 @@
-import { JsonSchema, CommonJsonSchema, JsonPatchOperation } from '../models/index';
+import { JsonSchema, CommonJsonSchema, JsonFormSchema, JsonPatchOperation } from '../models/index';
 import { SchemaNavigator } from '../navigator/schema-navigator';
 import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
@@ -179,8 +179,16 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
         pointer = fixJsonPointerPath(pointer);
 
         return this.compiledSchema.then(validator => {
-            if (!this.schema.fields[pointer]) {
-                debug(`[err] The given field is not available in the schema.fields regsitry, so I could not find it's schema! I did not validate the schema!`);
+            var fieldSchemas: JsonFormSchema[];
+            if (!!this.schema.fields[pointer]) {
+                fieldSchemas = [this.schema.fields[pointer]];
+            }
+            else {
+                fieldSchemas = this.schema.getFieldDescriptorForPointer(pointer);
+            }
+
+            if (!Array.isArray(fieldSchemas) || fieldSchemas.length === 0) {
+                debug(`[err] The given field is not available in the SchemaNavigator registry, so I could not find it's schema! I did not validate the schema!`);
                 return {
                     valid: false,
                     errors: [{
@@ -192,9 +200,9 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
                     } as ValidationError]
                 } as ValidationResult;
             }
-            return this.mapValidationResult(
-                this.validator.validate(this.schema.fields[pointer], value),
-                this.validator.errors)
+
+            return Promise.all(fieldSchemas.map(x => this.validator.validate(x, value)))
+                .then(results => this.mapValidationResult(_.every(results), this.validator.errors));
         });
     }
 
