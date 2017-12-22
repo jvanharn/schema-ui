@@ -202,12 +202,12 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
         }
 
         // Check if there is a page by this number.
-        if (page > this.totalPages) {
+        if (page > this.totalPages && this.loadingState !== CursorLoadingState.Uninitialized) {
             return Promise.reject(new Error('Pagenumber is higher than the amount of pages in this cursor.'));
         }
 
         // Get the page if the mapping is already known
-        if (this.pageMap.length >= page) {
+        if (this.pageMap.length >= page || page === 1) {
             return this.fetch(page - 1);
         }
 
@@ -224,6 +224,10 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
                     this.loadingState = CursorLoadingState.Empty;
                 }
                 return items;
+            })
+            .catch(err => {
+                this.loadingState = CursorLoadingState.Empty;
+                throw err;
             });
     }
 
@@ -281,12 +285,24 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
 
         var getPageIndex = (results: any[], currentPage: number, currentIndex?: number): Promise<any[]> => {
             return this.parent.select(currentPage).then(items => {
+                // We already passed the end of the stream! Probably incorrectly implemented wrapped cursor.
+                if (items.length === 0) {
+                    debug('[warn] we have not reached totalPages, but did receive empty page! incorrectly implemented parent cursor?');
+                    this.pageMap[index] = {
+                        fromPage: startPage,
+                        fromIndex: startIndex,
+                        toPage: Math.max(startPage, currentPage - 1),
+                        toIndex: this.limit
+                    };
+                    return results;
+                }
+
                 if (currentIndex) {
                     items = items.slice(currentIndex);
                 }
 
                 var filteredItems = filterCollectionBy(items, this._filters);
-                if (results.length + filteredItems.length >= this.limit) {
+                if (results.length + filteredItems.length >= this.limit || currentPage >= this.totalPages) {
                     this.pageMap[index] = {
                         fromPage: startPage,
                         fromIndex: startIndex,
