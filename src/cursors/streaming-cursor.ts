@@ -2,7 +2,7 @@ import { EventEmitter } from 'eventemitter3';
 import { ISortableCursor, CollectionSortDescriptor } from './sortable-cursor';
 import { IFilterableCursor, CollectionFilterDescriptor } from './filterable-cursor';
 import { filterCollectionBy, sortCollectionBy } from './value-cursor';
-import { ICursor, CursorLoadingState } from './cursor';
+import { ICursor, CursorLoadingState, PageChangeEvent } from './cursor';
 import { SchemaNavigator } from '../navigator/schema-navigator';
 
 import * as _ from 'lodash';
@@ -45,6 +45,9 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
      * Limit the results per page by the given number of items.
      */
     public get current(): number {
+        if (this._current === null) {
+            return null;
+        }
         return Math.max(this._current, 1);
     }
 //endregion
@@ -105,7 +108,7 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
     /**
      * The items of the current page.
      */
-    public items: T[] = [];
+    public items: T[];
 
     /**
      * Get the cursor schema.
@@ -121,7 +124,7 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
 
     public constructor(
         private parent: ICursor<T>,
-        initialPage: number = 1,
+        initialPage: number | null = parent.current,
         limit?: number,
     ) {
         super();
@@ -130,8 +133,12 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
             this._limit = limit;
         }
         if (initialPage != null && initialPage >= 1) {
-            debug(`loaded initial page ${initialPage} for streaming-cursor`);
+            debug(`loaded initial page ${initialPage} from constructor-override`);
             this.select(initialPage);
+        }
+        else if(this.parent.current != null) {
+            debug(`loaded initial page ${parent.current} from parent`);
+            this.select(parent.current);
         }
 
         var cur = this.parent as (IFilterableCursor<T> & ISortableCursor<T>);
@@ -195,25 +202,36 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
     public select(page: number, forceReload?: boolean): Promise<T[]> {
         // Check pagenumber validity
         if (!_.isInteger(page) || page < 1) {
-            return Promise.reject(new Error('Pagenumber has to be an integer of 1 or higher.'));
+            const err = new Error('Pagenumber has to be an integer of 1 or higher.');
+            this.emit('error', err);
+            return Promise.reject(err);
         }
-        if (this.current !== null && page === this.current && !forceReload) {
+        if (this._current !== null && this.pageMap.length > 0 && page === this.current && !forceReload) {
             return Promise.resolve(this.items);
         }
 
         // Check if there is a page by this number.
         if (page > this.totalPages && this.loadingState !== CursorLoadingState.Uninitialized) {
-            return Promise.reject(new Error('Pagenumber is higher than the amount of pages in this cursor.'));
+            const err = new Error('Pagenumber is higher than the amount of pages in this cursor.');
+            this.emit('error', err);
+            return Promise.reject(err);
         }
+
+        // Emit current state
+        this.emit('beforePageChange', { page, items: null } as PageChangeEvent<T>);
 
         // Get the page if the mapping is already known
+        var items: Promise<any[]>;
         if (this.pageMap.length >= page || page === 1) {
-            return this.fetch(page - 1);
+            items = this.fetch(page - 1);
+        }
+        else {
+            items = _
+                .range(this.pageMap.length - 1, page - 1)
+                .reduce((prev, i) => prev.then(() => this.fetch(i)), Promise.resolve([]));
         }
 
-        return _
-            .range(this.pageMap.length - 1, page - 1)
-            .reduce((prev, i) => prev.then(() => this.fetch(i)), Promise.resolve([]))
+        return items
             .then(items => {
                 this._current = page;
                 this.items = items;
@@ -223,10 +241,15 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
                 else {
                     this.loadingState = CursorLoadingState.Empty;
                 }
+
+                // Emit after page change.
+                this.emit('afterPageChange', { page: this._current, items: this.items } as PageChangeEvent<T>);
+
                 return items;
             })
             .catch(err => {
                 this.loadingState = CursorLoadingState.Empty;
+                this.emit('error', err);
                 throw err;
             });
     }
@@ -302,12 +325,15 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
                 }
 
                 var filteredItems = filterCollectionBy(items, this._filters);
+                // IF we have reached all the items we need to load the current page, stop.
+                // OR we have reached the last page of the parent cursor.
                 if (results.length + filteredItems.length >= this.limit || currentPage >= this.totalPages) {
                     this.pageMap[index] = {
                         fromPage: startPage,
                         fromIndex: startIndex,
                         toPage: currentPage,
-                        toIndex: (results.length + filteredItems.length) - this.limit - 1,
+                        // toIndex: (results.length + filteredItems.length) - this.limit - 1,
+                        toIndex: Math.max(Math.min(items.length, this.limit), 0),
                     }
                     return results.concat(filteredItems.slice(0, this.pageMap[index].toIndex));
                 }
