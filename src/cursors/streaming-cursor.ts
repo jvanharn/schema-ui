@@ -67,6 +67,10 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
             return;
         }
         this._limit = value;
+
+        // Apply on parent cursor
+        this.parent.limit = value;
+        this.clearPageMap();
     }
 //endregion
 
@@ -227,7 +231,7 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
         }
         else {
             items = _
-                .range(this.pageMap.length - 1, page - 1)
+                .range(this.pageMap.length - 1, page) // end is not included in the range, so this stops at page-1, which is exactly what we want
                 .reduce((prev, i) => prev.then(() => this.fetch(i)), Promise.resolve([]));
         }
 
@@ -338,7 +342,12 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
                     return results.concat(filteredItems.slice(0, this.pageMap[index].toIndex));
                 }
 
-                return getPageIndex(results.concat(filteredItems), currentPage + 1)
+                var intermediaryResults = results.concat(filteredItems);
+                return getPageIndex(intermediaryResults, currentPage + 1).catch(err => {
+                    // Probably an out-of-bounds error, ignore and return what we have.
+                    debug(`when trying to get more results than we currently had, we got an error:`, err);
+                    return intermediaryResults;
+                });
             });
         }
 
