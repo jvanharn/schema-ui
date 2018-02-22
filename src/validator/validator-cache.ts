@@ -22,8 +22,8 @@ export class ValidatorCache {
      * @param validatorGenerator A function that generates a new validator function for a schema, if it does not already have one cached.
      */
     public constructor(
-        cache: ISchemaCache,
-        fetcher: ISchemaFetcher,
+        public readonly cache: ISchemaCache,
+        public readonly fetcher: ISchemaFetcher,
         protected validatorGenerator: (schema: SchemaNavigator) => Promise<ISchemaValidator>
             = schema => (new AjvSchemaValidator(schema, cache, fetcher)).compilation
     ) { }

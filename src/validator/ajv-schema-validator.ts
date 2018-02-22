@@ -1,4 +1,4 @@
-import { JsonSchema, CommonJsonSchema, JsonPatchOperation } from '../models/index';
+import { JsonSchema, CommonJsonSchema, JsonFormSchema, JsonPatchOperation } from '../models/index';
 import { SchemaNavigator } from '../navigator/schema-navigator';
 import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
@@ -10,6 +10,7 @@ import * as ajv from 'ajv';
 import * as _ from 'lodash';
 import * as pointer from 'json-pointer';
 import * as debuglib from 'debug';
+import { fixJsonPointerPath } from '../index';
 var debug = debuglib('schema:validator:ajv');
 
 /**
@@ -158,8 +159,51 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
         return this.compiledSchema.then(validator =>
             this.mapValidationResult(
                 //validator(value, this.schema.getPropertyPointer(propertyName)) as boolean,
-                this.validator.validate(this.schema.fields[propertyName], value),
+                this.validator.validate(this.schema.fields[this.schema.getPropertyPointer(propertyName)], value),
                 this.validator.errors));
+    }
+
+    /**
+     * Validate the field with the given pointer.
+     *
+     * @param pointer The JSON-Pointer of the property to validate (as an sub-schema).
+     * @param value The value to validate with the schema.
+     *
+     * @return The result of the validation.
+     */
+    public validatePointer(pointer: string, value: any): Promise<ValidationResult> {
+        if (pointer == null || pointer.length <= 1) {
+            return Promise.reject(new Error(`Invalid field pointer given "${pointer}"`));
+        }
+
+        pointer = fixJsonPointerPath(pointer);
+
+        return this.compiledSchema.then(validator => {
+            var fieldSchemas: JsonFormSchema[];
+            if (!!this.schema.fields[pointer]) {
+                fieldSchemas = [this.schema.fields[pointer]];
+            }
+            else {
+                fieldSchemas = this.schema.getFieldDescriptorForPointer(pointer);
+            }
+
+            if (!Array.isArray(fieldSchemas) || fieldSchemas.length === 0) {
+                debug(`[err] The given field is not available in the SchemaNavigator registry, so I could not find it's schema! I did not validate the schema!`);
+                return {
+                    valid: false,
+                    errors: [{
+                        code: 'NO_SCHEMA_FOUND',
+                        message: `Couldnt validate this field, because I could not find an schema for the pointer "${pointer}"!`,
+                        params: [pointer],
+                        description: `Couldnt validate this field, because I could not find an schema for the pointer "${pointer}"!`,
+                        path: pointer
+                    } as ValidationError]
+                } as ValidationResult;
+            }
+
+            return Promise.all(fieldSchemas.map(x => this.validator.validate(x, value)))
+                .then(results => this.mapValidationResult(_.every(results), this.validator.errors));
+        });
     }
 
     /**

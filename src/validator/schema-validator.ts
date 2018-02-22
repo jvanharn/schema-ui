@@ -38,6 +38,16 @@ export interface ISchemaValidator {
     validateProperty(propertyName: string, value: any): Promise<ValidationResult>;
 
     /**
+     * Validate the field with the given pointer.
+     *
+     * @param pointer The JSON-Pointer of the property to validate (as an sub-schema).
+     * @param value The value to validate with the schema.
+     *
+     * @return The result of the validation.
+     */
+    validatePointer(pointer: string, value: any): Promise<ValidationResult>;
+
+    /**
      * Validate entity patch operations according to the schema.
      *
      * @param ops The operations that have to be validated according to the json schema.

@@ -46,6 +46,9 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
          * The page that the items collection currently reflects in the datasource.
          */
         public get current(): number {
+            if (this._current == null) {
+                return null;
+            }
             return Math.max(this._current, 1);
         }
         public set current(value: number) {
@@ -74,7 +77,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
     //endregion
 
     //region get/set totalPages
-        public _totalPages: number = 1;
+        public _totalPages: number = null;
 
         /**
          * Total number of pages in the datasource.
@@ -184,25 +187,19 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
     public constructor(
         public readonly schema: SchemaNavigator,
         private _wrapped: T[],
-        intialPage: number | null,
-        columns?: SchemaColumnDescriptor[],
+        initialPage: number | null = 1,
+        columns: SchemaColumnDescriptor[] = null,
         public copyOnSelect: boolean = true
     ) {
         super();
         this._count = _wrapped.length;
-        if (this._wrapped.length === 0) {
-            this.loadingState = CursorLoadingState.Empty;
-        }
-        else {
-            this.loadingState = CursorLoadingState.Ready;
-        }
 
-        if (_.isArray(columns)) {
+        if (_.isArray(columns) && columns.length > 0) {
             this.columns = columns;
         }
 
-        if (intialPage !== null) {
-            this.select(intialPage || 1);
+        if (initialPage !== null && _.isInteger(initialPage)) {
+            this.select(initialPage);
         }
     }
 
@@ -257,11 +254,18 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
     /**
      * @inherit
      */
-    public select(pageNumber: number = 1, forceReload?: boolean): Promise<T[]> {
+    public select(page: number = 1, forceReload?: boolean): Promise<T[]> {
+        // Emit current state
+        this.emit('beforePageChange', { page, items: null } as PageChangeEvent<T>);
+
         this._items = this._wrapped.slice();
 
         // Filters
         this._items = filterCollectionBy(this._items, this.filters);
+
+        // Set number of pages in the collection
+        this._count = this._items.length;
+        this._totalPages = Math.ceil(this._count / this._limit);
 
         // Search
         if (this.terms != null && this.terms.trim() != '') {
@@ -280,8 +284,13 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         this._items = sortCollectionBy(this._items, this.sorters);
 
         // Limit
-        var startIndex = (pageNumber - 1) * this.limit;
-        var endIndex = pageNumber * this.limit;
+        var startIndex = (page - 1) * this.limit;
+        var endIndex = page * this.limit;
+        if (startIndex >= this._items.length) {
+            const err = new Error(`The given page number "${page}" is higher than the amount of pages in this cursor.`);
+            this.emit('error', err);
+            return Promise.reject(err);
+        }
         this._items = _.slice(this._items, startIndex, endIndex);
 
         // Copy objects if needed
@@ -290,10 +299,13 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         }
 
         // Set cursor state
-        this._current = pageNumber;
+        this._current = page;
         this.loadingState = this._items.length > 0 ? CursorLoadingState.Ready : CursorLoadingState.Empty;
         this.areFiltersApplied = true;
         this.areSortersApplied = true;
+
+        // Emit after page change.
+        this.emit('afterPageChange', { page: this._current, items: this.items } as PageChangeEvent<T>);
 
         return Promise.resolve(this.items);
     }
