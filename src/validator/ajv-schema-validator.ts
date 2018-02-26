@@ -242,6 +242,10 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
      * @return A promise for an JsonSchema.
      */
     protected resolveMissingSchemaReference(ref: string): Promise<JsonSchema> {
+        if (!ref.endsWith('#')) {
+            ref = ref + '#';
+        }
+
         if (!!this.cache) {
             let schema = this.cache.getSchema(ref);
             if (!!schema) {
