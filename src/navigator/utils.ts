@@ -1,9 +1,11 @@
 import * as _ from 'lodash';
 import * as pointer from 'json-pointer';
 import * as debuglib from 'debug';
-var debug = debuglib('schema:utils');
+const debug = debuglib('schema:utils');
 
 import { JsonSchema, CommonJsonSchema } from '../models/index';
+import { ISchemaCache } from '../cache/schema-cache';
+import { ISchemaFetcher } from '../fetchers/schema-fetcher';
 
 /**
  * Fixes common mistakes in JsonPointers.
@@ -226,4 +228,43 @@ export function resolveSchema(schemaId: string, resolver: (id: string) => JsonSc
 export function isAllOfSubSchema(schemaId: string): boolean {
     var splitup = _.last(schemaId.split('#')).split('/');
     return splitup[splitup.length-2] === 'allOf';
+}
+
+/**
+ * Get a schema from cache or from a fetcher.
+ *
+ * @param schemaId Identity of the schema to get from cache or fetch.
+ * @param cache The cache object to get it from.
+ * @param fetcher The fetcher to get it from if the cache does not have it.
+ *
+ * @return A promise than resolves in the schema.
+ */
+export function getOrFetchSchema(schemaId: string, cache: ISchemaCache, fetcher?: ISchemaFetcher): Promise<JsonSchema> {
+    if (schemaId == null || typeof schemaId !== 'string') {
+        return Promise.reject(new Error('A schema-id must be a non-null string.'));
+    }
+
+    try {
+        var json = cache.getSchema(schemaId);
+        if (json != null) {
+            return Promise.resolve(json);
+        }
+    }
+    catch (e) { /* */ }
+
+    if (fetcher == null) {
+        return Promise.reject(new Error(`Could not source the schema by id [${schemaId}]; no fetcher given.`));
+    }
+
+    return fetcher.fetchSchema(schemaId).then(schema => {
+        // Try to register the result in the given schema cache
+        try {
+            cache.setSchema(schema);
+        }
+        catch(err) {
+            debug(`unable to register the schema with id [${schema.id}] with the cache.`, err);
+        }
+
+        return schema;
+    });
 }

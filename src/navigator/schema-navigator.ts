@@ -34,6 +34,8 @@ export const defaultFieldsetId = 'default';
 
 export const linkUriTemplateRegexp = /[^{\}]+(?=})/g;
 
+export const defaultVisibleFieldTypes = ['integer', 'numeric', 'string', 'boolean'];
+
 /**
  * Helper object for retrieving information from json-schema's.
  */
@@ -287,8 +289,12 @@ export class SchemaNavigator {
         /**
          * Checks whether the given schema is a visible form field.
          */
-        private qualifiesAsFormField(field: JsonFormSchema): boolean {
-            return (!!field.field && (field.field.visible === true || (field.field.type != null && field.field.visible !== false)));
+        private qualifiesAsFormField(field: JsonFormSchema, name?: string): boolean {
+            return (!!field.field && (
+                field.field.visible === true ||
+                (field.field.type != null && field.field.visible !== false) ||
+                (field.field.visible !== false && !(name in this.identityProperties) && defaultVisibleFieldTypes.indexOf(field.type) > -1)
+            ));
         }
 
         /**
