@@ -381,7 +381,8 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
 
         // Determine the source and target data types.
         let sourcePatch = (_.isArray(data) && !_.isEmpty(data) && !!data[0].op),
-            targetPatch = _.startsWith(link.encType, jsonPatchMimeType);
+            targetPatch = _.startsWith(link.encType, jsonPatchMimeType) ||
+                (String(link.method).toUpperCase() === 'PATCH' && !_.startsWith(link.encType, jsonPatchMimeType));
 
         // Set headers
         let headers: HeaderDictionary = {};
