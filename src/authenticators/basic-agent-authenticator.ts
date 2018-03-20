@@ -1,4 +1,4 @@
-import { Buffer } from 'buffer';
+import { fromByteArray } from 'base64-js';
 
 import { IAgentAuthenticator } from './agent-authenticator';
 import { HeaderDictionary } from '../agents/schema-agent';
@@ -21,8 +21,9 @@ export class BasicAgentAuthenticator implements IAgentAuthenticator {
      */
     public authenticateRequest(headers: HeaderDictionary): HeaderDictionary {
         if (this.username != null && this.username !== '') {
-            let buffer = new Buffer(this.username + ':' + this.password, 'binary');
-            headers['Authorization'] = 'Basic ' + buffer.toString('base64');
+            const encodable = this.username + ':' + this.password;
+            const encoded = fromByteArray(new Uint8Array(encodable.split('').map(chr => chr.charCodeAt(0))));
+            headers['Authorization'] = 'Basic ' + encoded;
         }
 
         return headers;

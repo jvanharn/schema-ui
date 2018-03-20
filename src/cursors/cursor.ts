@@ -1,6 +1,7 @@
+import { EventEmitter, ListenerFn } from 'eventemitter3';
+
 import { JsonSchema } from '../models/schema';
 import { SchemaNavigator } from '../navigator/schema-navigator';
-import { EventEmitter } from 'eventemitter3';
 
 import * as _ from 'lodash';
 import * as debuglib from 'debug';
@@ -177,7 +178,7 @@ export function getAllCursorPages<T>(cursor: ICursor<T>): Promise<T[]> {
             else {
                 debug(`getAllCursorPages: loading firstpage via afterPageChange event..`);
                 firstPage = new Promise((resolve, reject) => {
-                    var pageHandler: Function, errorHandler: Function;
+                    var pageHandler: ListenerFn, errorHandler: ListenerFn;
                     cursor.once('afterPageChange', pageHandler = (x: PageChangeEvent<T>) => void(resolve(x.items)) || cursor.removeListener('error', errorHandler, void 0, true));
                     cursor.once('error', (e: Error) => void(reject(e)) || cursor.removeListener('afterPageChange', pageHandler, void 0, true));
                 });

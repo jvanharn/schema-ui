@@ -1,3 +1,5 @@
+import { applyPatch } from 'fast-json-patch';
+
 import {
     JsonSchema,
 
@@ -23,9 +25,7 @@ import { ValueCursor } from '../cursors/value-cursor';
 import { SchemaNavigator } from '../navigator/schema-navigator';
 import { ISchemaValidator, AjvSchemaValidator, ValidatorCache } from '../validator/index';
 
-import jsonpatch from 'fast-json-patch';
 import * as _ from 'lodash';
-
 import * as debuglib from 'debug';
 var debug = debuglib('schema:value:agent');
 
@@ -417,7 +417,7 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
         if (sourcePatch) {
             var original = _.find(this._wrapped, matcher);
             if (original) {
-                jsonpatch.apply(original, data as any, true);
+                applyPatch(original, data as any, true, true);
                 return Promise.resolve(identity) as any;
             }
         }

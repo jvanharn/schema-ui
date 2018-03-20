@@ -1,6 +1,6 @@
 {
   "name": "json-schema-services",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "description": "Library that makes it easy to work with JsonSchema-enabled services. Requires Promises (polyfill with es6-promise if not available on your platform).",
   "main": "esm/index.js",
   "module": "esm/index.js",
@@ -21,17 +21,24 @@
   "license": "MIT",
   "dependencies": {
     "ajv": "4.11.8",
-    "axios": "^0.16.2",
-    "buffer": "^5.0.8",
+    "axios": "^0.18.0",
+    "base64-js": "^1.2.3",
     "debug": "^3.1.0",
     "eventemitter3": "^2.0.3",
-    "fast-json-patch": "1.1.10",
+    "fast-json-patch": "^2.0.6",
     "json-pointer": "^0.6.0",
-    "lodash": "^4.17.4",
+    "lodash": "^4.17.5",
     "qs": "^6.5.1",
     "url-template": "^2.0.8"
   },
   "devDependencies": {
+    "@types/axios": "^0.14.0",
+    "@types/base64-js": "^1.2.5",
+    "@types/debug": "0.0.30",
+    "@types/json-pointer": "^1.0.30",
+    "@types/lodash": "^4.14.105",
+    "@types/qs": "^6.5.1",
+    "@types/url-template": "^2.0.28",
     "rimraf": "^2.6.1",
     "typescript": "2.4.x"
   }

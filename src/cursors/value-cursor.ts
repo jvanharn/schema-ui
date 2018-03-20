@@ -507,7 +507,7 @@ export function sortCollectionBy<T>(collection: T[], sorters: CollectionSortDesc
 export function filterCollectionBy<T>(collection: T[], filters: CollectionFilterDescriptor[]): T[] {
     return _.filter(collection, x => _.every(filters, f => {
         if (f.path === '*') {
-            return _.some(_.toPairs(x), ([k, v]) => {
+            return _.some(_.toPairs(x as any), ([k, v]) => {
                 try {
                     return applyFilter({
                         path: '/' + k,

@@ -1,3 +1,6 @@
+import Axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { applyPatch, compare } from 'fast-json-patch';
+
 import {
     JsonSchema,
 
@@ -23,8 +26,6 @@ import { SchemaNavigator } from '../navigator/schema-navigator';
 import { ISchemaValidator, AjvSchemaValidator, ValidatorCache } from '../validator/index';
 
 import * as urltemplate from 'url-template';
-import jsonpatch from 'fast-json-patch';
-import * as axios from 'axios';
 import * as qs from 'qs';
 import * as _ from 'lodash';
 
@@ -142,13 +143,13 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
                 }
 
                 // Get the headers
-                let requestHeaders = _.assign<HeaderDictionary, HeaderDictionary>({}, this.headers, headers);
+                let requestHeaders = _.assign<any, HeaderDictionary, HeaderDictionary>({}, this.headers, headers);
                 if (!!this.authenticator) {
                     requestHeaders = this.authenticator.authenticateRequest(requestHeaders);
                 }
 
                 // Create the config
-                let config: Axios.AxiosXHRConfig<TRequest> = {
+                let config: AxiosRequestConfig = {
                     // Resolve the url and set the url data.
                     url: this.rebaseSchemaHyperlinkHref(this.fillSchemaHyperlinkParameters(link.href, urlData || data)),
                     method: link.method || 'GET',
@@ -169,7 +170,7 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
                 debug(`configured link ${link.rel} as [${config.method}] ${config.url}`);
 
                 // Return the created request
-                return axios<TRequest, TResponse>(config) as Promise<Axios.AxiosXHR<TResponse>>;
+                return Axios(config) as Promise<AxiosResponse>;
             })
             .then(xhr => {
                 debug(`completed [${this.schema.root.id}].links.${link.rel}`);
@@ -399,13 +400,13 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
         else if (!sourcePatch && targetPatch) {
             // We need to generate patch ops for the given data object.
             // Read the original object and generate the patch ops.
-            bodyData = this.read(urlData).then(original => jsonpatch.compare(original, data as T));
+            bodyData = this.read(urlData).then(original => compare(original, data as T));
         }
         else if (sourcePatch && !targetPatch) {
             // We have patch, and we need to put the whole object.
             // Read the original and apply the patches on it.
             bodyData = this.read(urlData).then(original => {
-                jsonpatch.apply(original, data as any, true);
+                applyPatch(original, data as any, true, true);
                 return original;
             });
         }

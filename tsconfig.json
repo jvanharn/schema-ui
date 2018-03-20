@@ -1,5 +1,5 @@
 {
-    "version": "2.1",
+    "version": "2.3",
     "compilerOptions": {
         "module": "commonjs",
         "target": "es5",
@@ -9,11 +9,13 @@
         "declaration": true,
         "sourceMap": true,
         "lib": ["es5", "es2015.promise", "es2015.core"],
+        "typeRoots": [
+            "node_modules/@types"
+        ],
         "outDir": "esm",
         "rootDir": "src"
     },
     "include": [
-        "typings/index.d.ts",
         "src/**/*"
     ],
     "exclude": [
