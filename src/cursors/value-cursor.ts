@@ -258,44 +258,50 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         // Emit current state
         this.emit('beforePageChange', { page, items: null } as PageChangeEvent<T>);
 
-        this._items = this._wrapped.slice();
+        // Check empty
+        if (this._wrapped.length === 0 && page === 1) {
+            this._items = [];
+        }
+        else {
+            this._items = this._wrapped.slice();
 
-        // Filters
-        this._items = filterCollectionBy(this._items, this.filters);
+            // Filters
+            this._items = filterCollectionBy(this._items, this.filters);
 
-        // Set number of pages in the collection
-        this._count = this._items.length;
-        this._totalPages = Math.ceil(this._count / this._limit);
+            // Set number of pages in the collection
+            this._count = this._items.length;
+            this._totalPages = Math.ceil(this._count / this._limit);
 
-        // Search
-        if (this.terms != null && this.terms.trim() != '') {
-            let qry = String(this.terms).toLowerCase();
-            this._items = _.filter(this._items, x => {
-                for (var key in x) {
-                    if (x.hasOwnProperty(key) && String(x[key]).toLowerCase().indexOf(qry) >= 0) {
-                        return true;
+            // Search
+            if (this.terms != null && this.terms.trim() != '') {
+                let qry = String(this.terms).toLowerCase();
+                this._items = _.filter(this._items, x => {
+                    for (var key in x) {
+                        if (x.hasOwnProperty(key) && String(x[key]).toLowerCase().indexOf(qry) >= 0) {
+                            return true;
+                        }
                     }
-                }
-                return false;
-            });
-        }
+                    return false;
+                });
+            }
 
-        // Sort
-        this._items = sortCollectionBy(this._items, this.sorters);
+            // Sort
+            this._items = sortCollectionBy(this._items, this.sorters);
 
-        // Limit
-        var startIndex = (page - 1) * this.limit;
-        var endIndex = page * this.limit;
-        if (startIndex >= this._items.length) {
-            const err = new Error(`The given page number "${page}" is higher than the amount of pages in this cursor.`);
-            this.emit('error', err);
-            return Promise.reject(err);
-        }
-        this._items = _.slice(this._items, startIndex, endIndex);
+            // Limit
+            var startIndex = (page - 1) * this.limit;
+            var endIndex = page * this.limit;
+            if (startIndex >= this._items.length) {
+                const err = new Error(`The given page number "${page}" is higher than the amount of pages in this cursor.`);
+                this.emit('error', err);
+                return Promise.reject(err);
+            }
+            this._items = _.slice(this._items, startIndex, endIndex);
 
-        // Copy objects if needed
-        if (this.copyOnSelect && _.isObject(_.first(this._items))) {
-            this._items = this._items.map(x => _.assign({}, x));
+            // Copy objects if needed
+            if (this.copyOnSelect && _.isObject(_.first(this._items))) {
+                this._items = this._items.map(x => _.assign({}, x));
+            }
         }
 
         // Set cursor state

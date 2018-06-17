@@ -30,3 +30,5 @@ export * from './agents/relatable-schema-agent';
 export * from './agents/authenticated-schema-agent';
 export * from './agents/endpoint-schema-agent';
 export * from './agents/value-schema-agent';
+
+export * from './helpers/agent-throttle';
