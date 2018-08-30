@@ -183,6 +183,9 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
             if (!!this.schema.fields[pointer]) {
                 fieldSchemas = [this.schema.fields[pointer]];
             }
+            else if (fixJsonPointerPath(this.schema.propertyPrefix) === pointer) {
+                fieldSchemas = [this.schema.root as JsonFormSchema];
+            }
             else {
                 fieldSchemas = this.schema.getFieldDescriptorForPointer(pointer);
             }
