@@ -232,7 +232,7 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
                 message: e.message,
                 params: e.params,
                 description: e.message,
-                path: e.dataPath
+                path: String(e.dataPath).replace('[\'', '/').replace('\'].', '/').replace('.', '/'),
             } as ValidationError))
         } as ValidationResult;
     }
