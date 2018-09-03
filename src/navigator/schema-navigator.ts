@@ -175,6 +175,12 @@ export class SchemaNavigator {
                     identities.push(key);
                 }
             }
+
+            // Always return an array with at least one item in it.
+            if (identities.length < 1) {
+                return [this.identityProperty];
+            }
+
             return identities;
         }
 
