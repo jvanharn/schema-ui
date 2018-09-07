@@ -1,6 +1,10 @@
 import { ISchemaAgent, HeaderDictionary, SchemaAgentResponse, SchemaAgentRejection } from "../agents/schema-agent";
 import { SchemaHyperlinkDescriptor } from "../models/schema";
 import { IdentityValues } from "../models/form";
+import { ICursor } from "../cursors/cursor";
+
+import * as debuglib from 'debug';
+const debug = debuglib('schema:agent:throttle');
 
 /**
  * Agent throttle queue.
@@ -81,6 +85,36 @@ export class AgentThrottleQueue {
     // public queueCallAsync(agent: ISchemaAgent, call: AgentExecuteCall): void {
 
     // }
+
+    /**
+     * Queue the given base call for every item in the given.
+     *
+     * @param agent
+     * @param cursor
+     * @param call
+     * @param progress
+     */
+    public queueCallsByCursor(agent: ISchemaAgent, cursor: ICursor<any>, call: AgentExecuteCall<any>, progress?: (index: number, item: any, result: SchemaAgentResponse<any>) => void): Promise<void> {
+        var promises: Promise<any>[] = [];
+
+        for (let i = 0; i < cursor.totalPages; i++) {
+            promises.push(cursor.select(1).then(items => {
+                debug(`queueing calls for page ${i} of ${cursor.totalPages} from [${cursor.schema.schemaId}]`);
+                return Promise.all(items.map(
+                    item => this.queueCall(agent, {
+                        link: call.link,
+                        headers: call.headers,
+                        data: call.data,
+                        urlData: Object.assign(item, call.urlData),
+                    }).then(result => {
+                        progress(i, item, result);
+                        return result;
+                    })));
+            }));
+        }
+
+        return Promise.all(promises) as any;
+    }
 
     /**
      * Starts the timer to invoke timed groups of requests.
