@@ -1,16 +1,17 @@
-import { JsonSchema, CommonJsonSchema, JsonFormSchema, JsonPatchOperation } from '../models/index';
+import { Ajv, ValidateFunction, Options as AjvOptions } from 'ajv';
+
+import { JsonSchema, JsonFormSchema, JsonPatchOperation } from '../models/index';
 import { SchemaNavigator } from '../navigator/schema-navigator';
 import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
 
 import { CommonFormats } from './common-formats';
 import { ISchemaValidator, ICompiledSchemaValidator, ValidationError, ValidationResult } from './schema-validator';
+import { fixJsonPointerPath } from '../index';
 
 import * as ajv from 'ajv';
 import * as _ from 'lodash';
-import * as pointer from 'json-pointer';
 import * as debuglib from 'debug';
-import { fixJsonPointerPath } from '../index';
 var debug = debuglib('schema:validator:ajv');
 
 /**
@@ -25,12 +26,17 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
     /**
      * The Schema validator.
      */
-    protected validator: ajv.Ajv;
+    protected validator: Ajv;
 
     /**
      * The compiled main schema.
      */
-    protected compiledSchema: Promise<ajv.ValidateFunction>;
+    protected compiledSchema: Promise<ValidateFunction>;
+
+    /**
+     * The last executed action, so we never run parralel operations on the same compiled schema instance.
+     */
+    protected lastAsyncAction: Promise<any>;
 
     /**
      * @param schema Schema to validate with.
@@ -41,35 +47,22 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
         public readonly schema: SchemaNavigator,
         protected readonly cache?: ISchemaCache,
         protected readonly fetcher?: ISchemaFetcher,
-        options?: ajv.Options
+        options?: AjvOptions
     ) {
         debug(`initialized AJV Schema Validator for schema.$id "${schema.original.id || schema.schemaId}"`);
 
         this.validator = new ajv(
             _.assign({
+                schemaId: 'auto',
                 formats: _.assign({}, CommonFormats, AjvSchemaValidator.formats),
-                loadSchema: (uri: string, cb: (err: Error, schema: Object) => any) =>
+                inlineRefs: false,
+                loadSchema: (uri: string): Promise<any> =>
                     this.resolveMissingSchemaReference(uri)
-                        .then(x => {
-                            // Catch any errors about the given schema already being registered.
-                            try {
-                                cb(null, x);
-                            }
-                            catch (e) {
-                                debug('[warn] error ocurred whilst calling callback off requested ajv-schema, ironically: ', e);
-                            }
-                        })
-                        .catch(e => {
-                            // Just in case the callback doesnt exist
-                            try {
-                                cb(e, void 0);
-                            }
-                            catch (e) {
-                                debug('[warn] error ocurred whilst calling callback during error handling off requested ajv-schema, ironically: ', e);
-                            }
+                        .catch(err => {
+                            debug('[warn] something went wrong trying to resolve a missing schema reference: ' + uri, err);
+                            return false;
                         }),
-                inlineRefs: false
-            } as ajv.Options, options));
+            } as AjvOptions, options));
 
         // this.validator.addKeyword('field', {
         //     metaSchema: {
@@ -101,22 +94,174 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
         //     } as JsonSchema
         // } as any);
 
-        this.compiledSchema = new Promise((resolve, reject) =>
-            this.validator.compileAsync(this.schema.original, (err, validate) => {
-                if (err == null) {
+        // Support draft 04 schemas
+        this.validator.addMetaSchema({
+            "id": "http://json-schema.org/draft-04/schema#",
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "description": "Core schema meta-schema",
+            "definitions": {
+                "schemaArray": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "$ref": "#" }
+                },
+                "positiveInteger": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "positiveIntegerDefault0": {
+                    "allOf": [ { "$ref": "#/definitions/positiveInteger" }, { "default": 0 } ]
+                },
+                "simpleTypes": {
+                    "enum": [ "array", "boolean", "integer", "null", "number", "object", "string" ]
+                },
+                "stringArray": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "minItems": 1,
+                    "uniqueItems": true
+                }
+            },
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "format": "uri"
+                },
+                "$schema": {
+                    "type": "string",
+                    "format": "uri"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "default": {},
+                "multipleOf": {
+                    "type": "number",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
+                },
+                "maximum": {
+                    "type": "number"
+                },
+                "exclusiveMaximum": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "minimum": {
+                    "type": "number"
+                },
+                "exclusiveMinimum": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "maxLength": { "$ref": "#/definitions/positiveInteger" },
+                "minLength": { "$ref": "#/definitions/positiveIntegerDefault0" },
+                "pattern": {
+                    "type": "string",
+                    "format": "regex"
+                },
+                "additionalItems": {
+                    "anyOf": [
+                        { "type": "boolean" },
+                        { "$ref": "#" }
+                    ],
+                    "default": {}
+                },
+                "items": {
+                    "anyOf": [
+                        { "$ref": "#" },
+                        { "$ref": "#/definitions/schemaArray" }
+                    ],
+                    "default": {}
+                },
+                "maxItems": { "$ref": "#/definitions/positiveInteger" },
+                "minItems": { "$ref": "#/definitions/positiveIntegerDefault0" },
+                "uniqueItems": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "maxProperties": { "$ref": "#/definitions/positiveInteger" },
+                "minProperties": { "$ref": "#/definitions/positiveIntegerDefault0" },
+                "required": { "$ref": "#/definitions/stringArray" },
+                "additionalProperties": {
+                    "anyOf": [
+                        { "type": "boolean" },
+                        { "$ref": "#" }
+                    ],
+                    "default": {}
+                },
+                "definitions": {
+                    "type": "object",
+                    "additionalProperties": { "$ref": "#" },
+                    "default": {}
+                },
+                "properties": {
+                    "type": "object",
+                    "additionalProperties": { "$ref": "#" },
+                    "default": {}
+                },
+                "patternProperties": {
+                    "type": "object",
+                    "additionalProperties": { "$ref": "#" },
+                    "default": {}
+                },
+                "dependencies": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "anyOf": [
+                            { "$ref": "#" },
+                            { "$ref": "#/definitions/stringArray" }
+                        ]
+                    }
+                },
+                "enum": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true
+                },
+                "type": {
+                    "anyOf": [
+                        { "$ref": "#/definitions/simpleTypes" },
+                        {
+                            "type": "array",
+                            "items": { "$ref": "#/definitions/simpleTypes" },
+                            "minItems": 1,
+                            "uniqueItems": true
+                        }
+                    ]
+                },
+                "allOf": { "$ref": "#/definitions/schemaArray" },
+                "anyOf": { "$ref": "#/definitions/schemaArray" },
+                "oneOf": { "$ref": "#/definitions/schemaArray" },
+                "not": { "$ref": "#" }
+            },
+            "dependencies": {
+                "exclusiveMaximum": [ "maximum" ],
+                "exclusiveMinimum": [ "minimum" ]
+            },
+            "default": {}
+        });
+
+        this.lastAsyncAction = this.compiledSchema = new Promise((resolve, reject) =>
+            this.validator.compileAsync(this.schema.original)
+                .then(validate => {
                     debug(`compiled ajv schema validator for schema.$id "${schema.original.id || schema.schemaId}"`);
                     resolve(validate);
-                }
-                else if (_.endsWith(err.message, 'already exists')) {
-                    debug(`[error] compilation failed of schema [${this.schema.schemaId}] because of a race condition triggered when multiple ajv.compileAsync calls are triggered at the same time`);
-                    debug('you can solve the above race condition by making sure they are always called in sequence, and never in parralel');
-                    reject(err);
-                }
-                else {
-                    debug(`[error] compilation failed of schema [${this.schema.schemaId}]: ${err.message}`);
-                    reject(err);
-                }
-            }));
+                }, err => {
+                    if (_.endsWith(err.message, 'already exists')) {
+                        debug(`[error] compilation failed of schema [${this.schema.schemaId}] because of a race condition triggered when multiple ajv.compileAsync calls are triggered at the same time`);
+                        debug('you can solve the above race condition by making sure they are always called in sequence, and never in parralel');
+                        reject(err);
+                    }
+                    else {
+                        debug(`[error] compilation failed of schema [${this.schema.schemaId}]: ${err.message}`);
+                        reject(err);
+                    }
+                }));
     }
 
     /**
@@ -134,11 +279,11 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
      * @return The result of the validation.
      */
     public validate<T>(item: T): Promise<ValidationResult> {
-        return this.compiledSchema.then(validator =>
+        return this.lastAsyncAction = this.lastAsyncAction.then(() =>
             this.mapValidationResult(
                 //@todo use the compiled schema and calculate the subpath (this shuould be possible with the newer json schemas)
                 //validator(item, this.schema.propertyPrefix) as boolean,
-                this.validator.validate(this.schema.schemaId, item),
+                this.validator.validate(this.schema.schemaId, item) as boolean,
                 this.validator.errors));
     }
 
@@ -156,10 +301,10 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
         }
 
         // @todo make this pointers instead of field names.
-        return this.compiledSchema.then(validator =>
+        return this.lastAsyncAction = this.lastAsyncAction.then(() =>
             this.mapValidationResult(
                 //validator(value, this.schema.getPropertyPointer(propertyName)) as boolean,
-                this.validator.validate(this.schema.fields[this.schema.getPropertyPointer(propertyName)], value),
+                this.validator.validate(this.schema.fields[this.schema.getPropertyPointer(propertyName)], value) as boolean,
                 this.validator.errors));
     }
 
@@ -178,7 +323,7 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
 
         pointer = fixJsonPointerPath(pointer);
 
-        return this.compiledSchema.then(validator => {
+        return this.lastAsyncAction = this.lastAsyncAction.then(() => {
             var fieldSchemas: JsonFormSchema[];
             if (!!this.schema.fields[pointer]) {
                 fieldSchemas = [this.schema.fields[pointer]];
