@@ -197,7 +197,7 @@ export class AjvSchemaValidator implements ICompiledSchemaValidator, ISchemaVali
                     errors: [{
                         code: 'NO_SCHEMA_FOUND',
                         message: `Couldnt validate this field, because I could not find an schema for the pointer "${pointer}"!`,
-                        params: [pointer],
+                        params: { pointer },
                         description: `Couldnt validate this field, because I could not find an schema for the pointer "${pointer}"!`,
                         path: pointer
                     } as ValidationError]

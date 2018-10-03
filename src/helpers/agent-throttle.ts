@@ -46,7 +46,7 @@ export class AgentThrottleQueue {
      */
     public queueCall<TRequest, TResponse>(agent: ISchemaAgent, call: AgentExecuteCall<TRequest>): Promise<SchemaAgentResponse<TResponse>> {
         if (this.timerId == null) {
-            this.startTimer();
+            this.runTimer();
         }
 
         return new Promise((resolve, reject) => this.queue.push({ agent, call, resolve, reject }));
@@ -119,14 +119,17 @@ export class AgentThrottleQueue {
     /**
      * Starts the timer to invoke timed groups of requests.
      */
-    private startTimer(): void {
-        this.timerId = setTimeout(() => {
-            this.executeNextGroup().then(() => {
-                if (this.timerId != null) {
-                    this.startTimer();
-                }
-            });
-        }, this.delay);
+    private runTimer(): void {
+        this.timerId = 1;
+        this.executeNextGroup().then(() => {
+            if (this.timerId != null) {
+                this.timerId = setTimeout(() => {
+                    if (this.timerId != null) {
+                        this.runTimer();
+                    }
+                }, this.delay);
+            }
+        });
     }
 
     /**

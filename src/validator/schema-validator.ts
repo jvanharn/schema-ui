@@ -1,13 +1,7 @@
-import { JsonSchema, CommonJsonSchema, JsonPatchOperation } from '../models/index';
+import { JsonPatchOperation, IdentityValues } from '../models/index';
 import { SchemaNavigator } from '../navigator/schema-navigator';
-import { ISchemaCache } from '../cache/schema-cache';
-import { ISchemaFetcher } from '../fetchers/schema-fetcher';
 
-import { CommonFormats } from './common-formats';
-
-import * as ajv from 'ajv';
 import * as _ from 'lodash';
-import * as pointer from 'json-pointer';
 
 /**
  * Interface that helps with the validation of a schema or it's properties.
@@ -108,7 +102,7 @@ export interface ValidationError {
     /**
      * Parameters for use with the error message about what specifically was wrong with the value, depends on the code.
      */
-    params: string[];
+    params: IdentityValues;
 
     /**
      * JSON Pointer to the value that this error applies to.

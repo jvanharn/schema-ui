@@ -63,6 +63,10 @@ export enum CollectionFilterOperator {
     NotContains,
 
     ContainsKey,
+
+    // Group operators that make it possible to nest filter rules.
+    GroupSome, // OR
+    GroupEvery, // AND
 }
 
 /**
