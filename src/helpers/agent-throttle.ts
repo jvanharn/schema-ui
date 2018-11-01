@@ -34,8 +34,9 @@ export class AgentThrottleQueue {
      *
      * @param delay Minimal amount of seconds between groups of calls.
      * @param groupSize Execute groups of this many requests at a time.
+     * @param checkInterval How often it will check for calls, if it had nothing to do last time.
      */
-    public constructor(public readonly delay: number = 5000, public groupSize: number = 3) { }
+    public constructor(public readonly delay: number = 5000, public groupSize: number = 10, public checkInterval: number = delay) { }
 
     /**
      * Queue call to agent.
@@ -63,10 +64,12 @@ export class AgentThrottleQueue {
     public queueCalls(agent: ISchemaAgent, calls: AgentExecuteCall<any>[], progress?: (index: number, call: AgentExecuteCall<any>, result: SchemaAgentResponse<any>) => void): Promise<void> {
         var promises: Promise<any>[] = [];
 
-        for (let i=0; i < calls.length; i++) {
+        for (let i = 0; i < calls.length; i++) {
             promises.push(this.queueCall<any, any>(agent, calls[i])
                 .then(result => {
-                    progress(i, calls[i], result);
+                    if (typeof progress === 'function') {
+                        progress(i, calls[i], result);
+                    }
                     return result;
                 }));
         }
@@ -97,17 +100,19 @@ export class AgentThrottleQueue {
     public queueCallsByCursor(agent: ISchemaAgent, cursor: ICursor<any>, call: AgentExecuteCall<any>, progress?: (index: number, item: any, result: SchemaAgentResponse<any>) => void): Promise<void> {
         var promises: Promise<any>[] = [];
 
-        for (let i = 0; i < cursor.totalPages; i++) {
-            promises.push(cursor.select(1).then(items => {
-                debug(`queueing calls for page ${i} of ${cursor.totalPages} from [${cursor.schema.schemaId}]`);
+        for (let page = 1; page <= cursor.totalPages; page++) {
+            promises.push(cursor.select(page).then(items => {
+                debug(`queueing calls for page ${page} of ${cursor.totalPages} from [${cursor.schema.schemaId}]`);
                 return Promise.all(items.map(
-                    item => this.queueCall(agent, {
+                    (item, index) => this.queueCall(agent, {
                         link: call.link,
                         headers: call.headers,
                         data: call.data,
                         urlData: Object.assign(item, call.urlData),
                     }).then(result => {
-                        progress(i, item, result);
+                        if (typeof progress === 'function') {
+                            progress(((page - 1) * cursor.limit) + index, item, result);
+                        }
                         return result;
                     })));
             }));
@@ -121,13 +126,13 @@ export class AgentThrottleQueue {
      */
     private runTimer(): void {
         this.timerId = 1;
-        this.executeNextGroup().then(() => {
+        this.executeNextGroup().then(processed => {
             if (this.timerId != null) {
                 this.timerId = setTimeout(() => {
                     if (this.timerId != null) {
                         this.runTimer();
                     }
-                }, this.delay);
+                }, processed > 0 ? this.delay : this.checkInterval);
             }
         });
     }
@@ -135,7 +140,7 @@ export class AgentThrottleQueue {
     /**
      * Executes the next group of queued items.
      */
-    private executeNextGroup(): Promise<void> {
+    private executeNextGroup(): Promise<number> {
         var group: Promise<void>[] = [];
 
         for (let i = 0; i < this.groupSize && this.queued > 0; i++) {
@@ -154,7 +159,7 @@ export class AgentThrottleQueue {
                 }));
         }
 
-        return Promise.all(group) as Promise<any>;
+        return Promise.all(group).then(result => result.length);
     }
 
     /**
