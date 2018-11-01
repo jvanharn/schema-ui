@@ -523,7 +523,10 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
             return new Promise((resolve, reject) => {
                 this.fetcher.fetchSchema(link.schema['$ref'])
                     .then(resolve)
-                    .catch(e => resolve(null) || debug(`Unable to find the request schema for link "${link.rel}" with $ref "${link.schema.$ref}":`, e));
+                    .catch(e => {
+                        debug(`Unable to find the request schema for link "${link.rel}" with $ref "${link.schema.$ref}":`, e);
+                        resolve(null);
+                    });
             });
         }
 
