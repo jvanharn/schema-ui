@@ -17,15 +17,10 @@ export class ValidatorCache {
     private validators: { [hash: string]: Promise<ISchemaValidator> } = { };
 
     /**
-     * @param cache Cache used to resolve missing child schemas.
-     * @param fetcher Fetcher used to fetch missing, unfetched schemas.
      * @param validatorGenerator A function that generates a new validator function for a schema, if it does not already have one cached.
      */
     public constructor(
-        public readonly cache: ISchemaCache,
-        public readonly fetcher: ISchemaFetcher,
         protected validatorGenerator: (schema: SchemaNavigator) => Promise<ISchemaValidator>
-            = schema => (new AjvSchemaValidator(schema, cache, fetcher)).compilation
     ) { }
 
     /**
@@ -69,4 +64,14 @@ export class ValidatorCache {
     private isParentSchemaOf(parent: string, childSchemaId: string): boolean {
         return _.startsWith(parent, childSchemaId);
     }
+}
+
+/**
+ * Helper method that creates a validator cache for AJV. Usefull as a fallback/default.
+ *
+ * @param cache Cache used to resolve missing child schemas.
+ * @param fetcher Fetcher used to fetch missing, unfetched schemas.
+ */
+export function createAjvValidatorCache(cache: ISchemaCache, fetcher: ISchemaFetcher): ValidatorCache {
+    return new ValidatorCache(schema => (new AjvSchemaValidator(schema, cache, fetcher)).compilation);
 }
