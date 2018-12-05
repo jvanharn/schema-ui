@@ -1,4 +1,3 @@
-import { JsonSchema } from '../models';
 import { ISchemaValidator } from './schema-validator';
 import { SchemaNavigator } from '../navigator/schema-navigator';
 import { ISchemaCache } from '../cache/schema-cache';
@@ -22,6 +21,13 @@ export class ValidatorCache {
     public constructor(
         protected validatorGenerator: (schema: SchemaNavigator) => Promise<ISchemaValidator>
     ) { }
+
+    /**
+     * Clear the validator cache.
+     */
+    public clear(): void {
+        this.validators = { };
+    }
 
     /**
      * Get a validator.
