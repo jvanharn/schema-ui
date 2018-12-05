@@ -13,7 +13,7 @@ export class ValidatorCache {
     /**
      * Cache of schemas.
      */
-    private validators: { [hash: string]: Promise<ISchemaValidator> } = { };
+    protected validators: { [hash: string]: Promise<ISchemaValidator> } = { };
 
     /**
      * @param validatorGenerator A function that generates a new validator function for a schema, if it does not already have one cached.
@@ -57,7 +57,7 @@ export class ValidatorCache {
      *
      * @param schema Schema navigator.
      */
-    private generateSchemaNavigatorHash(schema: SchemaNavigator): string {
+    protected generateSchemaNavigatorHash(schema: SchemaNavigator): string {
         return schema.schemaId + schema.propertyPrefix;
     }
 
@@ -67,7 +67,7 @@ export class ValidatorCache {
      * @param parent Hash of the possible parent schema validator.
      * @param childSchemaId The schema id of the child.
      */
-    private isParentSchemaOf(parent: string, childSchemaId: string): boolean {
+    protected isParentSchemaOf(parent: string, childSchemaId: string): boolean {
         return _.startsWith(parent, childSchemaId);
     }
 }
