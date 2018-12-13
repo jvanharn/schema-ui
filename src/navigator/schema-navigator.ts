@@ -636,7 +636,7 @@ export class SchemaNavigator {
                 return pointer.get(data, this.identityPointer);
             }
             catch (e) {
-                return pointer.get(data, this.identityPointer.substr(this.propertyPrefix.length));
+                return pointer.get(data, this.identityPointer.substr(this.propertyPrefix.length - 1));
             }
         }
 
