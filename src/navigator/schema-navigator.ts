@@ -641,6 +641,22 @@ export class SchemaNavigator {
         }
 
         /**
+         * Whether or no the identity value has been set to a undefined value. (Any value is ok)
+         *
+         * @param data The data to fetch the identity property value from.
+         *
+         * @return Whether or not the identity value is set to a non null/undefined value.
+         */
+        public hasIdentityValue(data: any): boolean {
+            try {
+                return pointer.has(data, this.identityPointer);
+            }
+            catch (e) {
+                return false;
+            }
+        }
+
+        /**
          * Get all identity property values found in the schema.
          *
          * @param data The data to fetch the identity property values from.
