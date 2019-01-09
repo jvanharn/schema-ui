@@ -1,6 +1,7 @@
 export * from './models/index';
 
 export * from './cursors/cursor';
+export * from './cursors/maskable-cursor';
 export * from './cursors/searchable-cursor';
 export * from './cursors/sortable-cursor';
 export * from './cursors/filterable-cursor';

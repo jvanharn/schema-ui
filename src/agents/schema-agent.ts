@@ -56,6 +56,7 @@ export interface ISchemaAgent {
      *
      * @param identity The identity-value(s) of the entity item to read/fetch, will be used to find variable-ref values in the url.
      * @param linkName The name of the link to use to read the item with.
+     * @param mask (Optionally) A list of JSON-Pointers that describe what fields should be included in the response, in order to reduce response data size. (May be ignored by agent)
      *
      * @return An promise that resolves into the requested entity, and adheres to the set link schema, if it is set.
      */
@@ -126,10 +127,12 @@ export interface ISchemaAgent {
      * @param link The hyper(media)link to execute/fetch.
      * @param data (Optionally) The data to send with the request (if the request is an post for example, send as post data, otherwise as query parameters, ...).
      * @param urlData (Optionally) Data object to resolve parameters from the url in. If not set, uses the data object, if that's not set it rejects.
+     * @param headers (Optionally) An dictionary of custom headers for the schema-agent to customize behaviour specific to one agent.
+     * @param mask (Optionally) A list of JSON-Pointers that describe what fields should be included in the response, in order to reduce response data size. (May be ignored by agent)
      *
      * @return An promise resolving into the decoded response from the server/service/remote.
      */
-    execute<TRequest, TResponse>(link: SchemaHyperlinkDescriptor, data?: TRequest, urlData?: IdentityValues, headers?: HeaderDictionary): Promise<SchemaAgentResponse<TResponse>>;
+    execute<TRequest, TResponse>(link: SchemaHyperlinkDescriptor, data?: TRequest, urlData?: IdentityValues, headers?: HeaderDictionary, mask?: string[]): Promise<SchemaAgentResponse<TResponse>>;
 }
 
 /**
