@@ -1,8 +1,9 @@
 import { CursorLoadingState, PageChangeEvent, getAllCursorPages } from './cursor';
 import { CollectionFilterDescriptor, CollectionFilterOperator } from './filterable-cursor';
-import { CollectionSortDescriptor, SortingDirection, inverseSortMode } from './sortable-cursor';
+import { CollectionSortDescriptor, SortingDirection } from './sortable-cursor';
 import { IColumnizedCursor } from './columnized-cursor';
 import { SchemaColumnDescriptor } from '../models/table';
+import { JsonFormSchema } from '../models/form';
 import { ISearchableCursor } from './searchable-cursor';
 import { SchemaNavigator } from '../navigator/schema-navigator';
 
@@ -266,7 +267,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
             this._items = this._wrapped.slice();
 
             // Filters
-            this._items = filterCollectionBy(this._items, this.filters);
+            this._items = filterCollectionBy(this._items, this.filters, this.schema);
 
             // Set number of pages in the collection
             this._count = this._items.length;
@@ -510,10 +511,11 @@ export function sortCollectionBy<T>(collection: T[], sorters: CollectionSortDesc
 /**
  * Applies CollectionFilterDescriptor to a collection.
  */
-export function filterCollectionBy<T>(collection: T[], filters: CollectionFilterDescriptor[]): T[] {
-    return _.filter(collection, x => _.every(filters, f => {
+export function filterCollectionBy<T>(collection: T[], filters: CollectionFilterDescriptor[], schema?: SchemaNavigator): T[] {
+    return collection.filter(x => filters.every(f => {
+        // Check if it is a star/global search
         if (f.path === '*') {
-            return _.some(_.toPairs(x as any), ([k, v]) => {
+            return _.toPairs(x as any).some(([k, v]) => {
                 try {
                     return applyFilter({
                         path: '/' + k,
@@ -526,11 +528,26 @@ export function filterCollectionBy<T>(collection: T[], filters: CollectionFilter
             });
         }
 
-        try {
-            return applyFilter(f, pointer.get(x, f.path))
-        } catch (e) {
-            return false;
+        // Fetch the schema of the filtered item
+        var valueSchemas = schema.getFieldDescriptorForPointer(f.path);
+        if (valueSchemas == null || valueSchemas.length === 0) {
+            throw new Error(`The given filter path "${f.path}" does not exist.`);
         }
+
+        // Normalize filter value
+        f.value = normalizeFilterValue(f, valueSchemas);
+
+        // Fetch and normalize the collection value
+        var val: any;
+        try {
+            val = normalizeCollectionValue(pointer.get(x, f.path), valueSchemas);
+        }
+        catch (e) {
+            val = void 0;
+        }
+
+        // Apply filter
+        return applyFilter(f, val);
     }));
 }
 
@@ -543,67 +560,263 @@ function applyFilter(filter: CollectionFilterDescriptor, val: any): boolean {
     }
     switch (filter.operator) {
         case CollectionFilterOperator.Contains:
-            return String(val).toLowerCase()
-                .indexOf(String(filter.value).toLowerCase()) >= 0;
+            return String(val).toLowerCase().indexOf(String(filter.value).toLowerCase()) >= 0;
         case CollectionFilterOperator.ContainsKey:
-            if (!_.isObject(val)) {
+            if (typeof val === 'object') {
+                var keys = Object.keys(val);
+                if (Array.isArray(filter.value)) {
+                    return filter.value.every(x => keys.indexOf(String(x).toLowerCase()) > -1);
+                }
+                return keys.indexOf(String(filter.value).toLowerCase()) > -1;
+            }
+            else if (Array.isArray(val)) {
+                if (typeof filter.value === 'number') {
+                    return filter.value < val.length;
+                }
                 return false;
             }
-            let keys = _.keys(val);
-            if (_.isArray(filter.value)) {
-                return _.every(filter.value, x => _.includes(keys, String(x).toLowerCase()));
+            else {
+                return false;
             }
-            return _.includes(keys, String(filter.value).toLowerCase());
         case CollectionFilterOperator.NotContains:
-            return String(val).toLowerCase()
-                .indexOf(String(filter.value).toLowerCase()) < 0;
+            return String(val).toLowerCase().indexOf(String(filter.value).toLowerCase()) < 0;
         case CollectionFilterOperator.Equals:
             return String(val).toLowerCase() === String(filter.value).toLowerCase();
         case CollectionFilterOperator.NotEquals:
             return String(val).toLowerCase() !== String(filter.value).toLowerCase();
         case CollectionFilterOperator.LessThan:
-            if (_.isNumber(val)) {
+            if ((typeof val === 'number' && typeof filter.value === 'number') || (val instanceof Date && filter.value instanceof Date)) {
                 return val < filter.value;
             }
-            else if (_.isString(val) || _.isArray(val)) {
+            else if ((typeof val === 'string' || Array.isArray(val)) && typeof filter.value === 'number') {
                 return val.length < filter.value;
             }
             return false;
         case CollectionFilterOperator.LessThanOrEquals:
-            if (_.isNumber(val)) {
+            if ((typeof val === 'number' && typeof filter.value === 'number') || (val instanceof Date && filter.value instanceof Date)) {
                 return val <= filter.value;
             }
-            else if (_.isString(val) || _.isArray(val)) {
+            else if ((typeof val === 'string' || Array.isArray(val)) && typeof filter.value === 'number') {
                 return val.length <= filter.value;
             }
             return false;
         case CollectionFilterOperator.GreaterThan:
-            if (_.isNumber(val)) {
+            if ((typeof val === 'number' && typeof filter.value === 'number') || (val instanceof Date && filter.value instanceof Date)) {
                 return val > filter.value;
             }
-            else if (_.isString(val) || _.isArray(val)) {
+            else if ((typeof val === 'string' || Array.isArray(val)) && typeof filter.value === 'number') {
                 return val.length > filter.value;
             }
             return false;
         case CollectionFilterOperator.GreaterThanOrEquals:
-            if (_.isNumber(val)) {
+            if ((typeof val === 'number' && typeof filter.value === 'number') || (val instanceof Date && filter.value instanceof Date)) {
                 return val >= filter.value;
             }
-            else if (_.isString(val) || _.isArray(val)) {
+            else if ((typeof val === 'string' || Array.isArray(val)) && typeof filter.value === 'number') {
                 return val.length >= filter.value;
             }
             return false;
         case CollectionFilterOperator.In:
-            if (_.isArray(filter.value)) {
+            if (Array.isArray(filter.value) && !(Array.isArray(val) || typeof val === 'object')) {
                 return _.includes(filter.value, val);
             }
-            return String(val) === String(filter.value);
+            return String(val).toLowerCase().indexOf(String(filter.value).toLowerCase()) !== -1;
         case CollectionFilterOperator.NotIn:
-            if (_.isArray(filter.value)) {
+            if (Array.isArray(filter.value) && !(Array.isArray(val) || typeof val === 'object')) {
                 return !_.includes(filter.value, val);
             }
-            return String(val) === String(filter.value);
+            return String(val).toLowerCase().indexOf(String(filter.value).toLowerCase()) === -1;
         default:
             debug(`[error] Got invalid Collection filter operator value "${filter.operator}"`);
+    }
+}
+
+/**
+ * Convert the filter value to a usable value.
+ *
+ * @param filter Filter to format the value for.
+ * @param valueSchemas The schema for the given value.
+ */
+function normalizeFilterValue(filter: CollectionFilterDescriptor, valueSchemas: JsonFormSchema[]): any {
+    // Check if it fits any of the schemas already
+    for (var schema of valueSchemas) {
+        switch (schema.type) {
+            case 'string':
+                if ((schema.format === 'iso8601' || schema.format === 'date' || schema.format === 'datetime') && typeof filter.value === 'object' && filter.value instanceof Date) {
+                    return filter.value;
+                }
+                else if (typeof filter.value === 'string') {
+                    return filter.value;
+                }
+
+            case 'integer':
+                if (typeof filter.value === 'number' && Number.isSafeInteger(filter.value)) {
+                    return filter.value;
+                }
+
+            case 'number':
+                if (typeof filter.value === 'number') {
+                    return filter.value;
+                }
+
+            case 'array':
+                if (Array.isArray(filter.value)) {
+                    return filter.value;
+                }
+
+            case 'null':
+                if (filter.value === void 0 || filter.value === null) {
+                    return filter.value;
+                }
+
+            default: break;
+        }
+    }
+
+    // Otherwise convert to the first
+    const valueSchema = _.first(valueSchemas);
+    if (valueSchema.oneOf) {
+        return normalizeFilterValue(filter, valueSchema.oneOf as any[]);
+    }
+    switch (valueSchema.type) {
+        case 'string':
+            if (valueSchema.format === 'iso8601' || valueSchema.format === 'date' || valueSchema.format === 'datetime') {
+                if (typeof filter.value === 'object' && filter.value instanceof Date) {
+                    return filter.value;
+                }
+                else if (/^\d+$/.test(filter.value)) {
+                    var result = new Date();
+                    var val = String(filter.value);
+                    // This works for dates after "Sat Mar 03 1973 09:46:39 UTC", dont really care for the rest.
+                    if (val.length >= 12) {
+                        result.setTime(parseInt(val, 10));
+                    }
+                    else {
+                        result.setTime(parseInt(val, 10) * 1000);
+                    }
+                    return result;
+                }
+                else {
+                    return new Date(filter.value);
+                }
+            }
+
+            return String(filter.value);
+
+        case 'integer':
+            var int = parseInt(String(filter.value), 10);
+            if (Number.isNaN(int)) {
+                return 0;
+            }
+            return int;
+
+        case 'number':
+            var flt = parseFloat(String(filter.value));
+            if (Number.isNaN(flt)) {
+                return 0.0;
+            }
+            return flt;
+
+        case 'array':
+            return filter.value;
+
+        default:
+            return filter.value;
+    }
+}
+
+/**
+ * Convert the filter value to a usable value.
+ *
+ * @param value The value that is stored in the collection.
+ * @param valueSchemas The schema for the given value.
+ */
+function normalizeCollectionValue(value: any, valueSchemas: JsonFormSchema[]): any {
+    // Check if it fits any of the schemas already
+    for (var schema of valueSchemas) {
+        switch (schema.type) {
+            case 'string':
+                if (schema.format === 'iso8601' || schema.format === 'date' || schema.format === 'datetime') {
+                    if (typeof value === 'object' && value instanceof Date) {
+                        return value;
+                    }
+                }
+                else if (typeof value === 'string') {
+                    return value;
+                }
+
+            case 'integer':
+                if (typeof value === 'number' && Number.isSafeInteger(value)) {
+                    return value;
+                }
+
+            case 'number':
+                if (typeof value === 'number') {
+                    return value;
+                }
+
+            case 'array':
+                if (Array.isArray(value)) {
+                    return value;
+                }
+
+            case 'null':
+                if (value === void 0 || value === null) {
+                    return value;
+                }
+
+            default: break;
+        }
+    }
+
+    // Otherwise convert to the first
+    const valueSchema = _.first(valueSchemas);
+    if (valueSchema.oneOf) {
+        return normalizeCollectionValue(value, valueSchema.oneOf as any[]);
+    }
+    switch (valueSchema.type) {
+        case 'string':
+            if (valueSchema.format === 'iso8601' || valueSchema.format === 'date' || valueSchema.format === 'datetime') {
+                if (typeof value === 'object' && value instanceof Date) {
+                    return value;
+                }
+                else if (/^\d+$/.test(value)) {
+                    var result = new Date();
+                    var val = String(value);
+                    // This works for dates after "Sat Mar 03 1973 09:46:39 UTC", dont really care for the rest.
+                    if (val.length >= 12) {
+                        result.setTime(parseInt(val, 10));
+                    }
+                    else {
+                        result.setTime(parseInt(val, 10) * 1000);
+                    }
+                    return result;
+                }
+                else {
+                    return new Date(value);
+                }
+            }
+
+            return String(value);
+
+        case 'integer':
+            var int = parseInt(String(value), 10);
+            if (Number.isNaN(int)) {
+                return 0;
+            }
+            return int;
+
+        case 'number':
+            var flt = parseFloat(String(value));
+            if (Number.isNaN(flt)) {
+                return 0.0;
+            }
+            return flt;
+
+        case 'array':
+            return value;
+
+        default:
+            return value;
     }
 }
