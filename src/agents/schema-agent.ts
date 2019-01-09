@@ -46,10 +46,11 @@ export interface ISchemaAgent {
      *
      * @param identity The identity of the entity item to read/fetch.
      * @param linkName The name of the link to use to read the item with.
+     * @param mask (Optionally) A list of JSON-Pointers that describe what fields should be included in the response, in order to reduce response data size. (May be ignored by agent)
      *
      * @return An promise that resolves into the requested entity, and adheres to the set link schema, if it is set.
      */
-    read<T>(identity: EntityIdentity, linkName?: string): Promise<T>;
+    read<T>(identity: EntityIdentity, linkName?: string, mask?: string[]): Promise<T>;
 
     /**
      * Read an item of the currently set schema.
@@ -60,7 +61,7 @@ export interface ISchemaAgent {
      *
      * @return An promise that resolves into the requested entity, and adheres to the set link schema, if it is set.
      */
-    read<T>(identity: EntityIdentity, linkName?: string): Promise<T>;
+    read<T>(identity: EntityIdentity, linkName?: string, mask?: string[]): Promise<T>;
 
     /**
      * Get a cursor for this collection (if the schema supports this) and filter it's contents.
