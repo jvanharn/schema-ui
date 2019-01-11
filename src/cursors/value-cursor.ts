@@ -528,22 +528,28 @@ export function filterCollectionBy<T>(collection: T[], filters: CollectionFilter
             });
         }
 
-        // Fetch the schema of the filtered item
-        var valueSchemas = schema.getFieldDescriptorForPointer(f.path);
-        if (valueSchemas == null || valueSchemas.length === 0) {
-            throw new Error(`The given filter path "${f.path}" does not exist.`);
-        }
-
-        // Normalize filter value
-        f.value = normalizeFilterValue(f, valueSchemas);
-
-        // Fetch and normalize the collection value
+        // Fetch the collection value
         var val: any;
         try {
-            val = normalizeCollectionValue(pointer.get(x, f.path), valueSchemas);
+            val = pointer.get(x, f.path);
         }
         catch (e) {
             val = void 0;
+        }
+
+        // If we have a schema, then we can normalize the values
+        if (schema) {
+            // Fetch the schema of the filtered item
+            var valueSchemas = schema.getFieldDescriptorForPointer(f.path);
+            if (valueSchemas == null || valueSchemas.length === 0) {
+                throw new Error(`The given filter path "${f.path}" does not exist.`);
+            }
+
+            // Normalize filter value
+            f.value = normalizeFilterValue(f, valueSchemas);
+
+            // Normalize the collection value
+            val = normalizeCollectionValue(val, valueSchemas);
         }
 
         // Apply filter
