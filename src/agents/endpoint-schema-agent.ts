@@ -113,10 +113,17 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
      * @param data (Optionally) The data to send with the request (if the request is an post for example, send as post data, otherwise as query parameters, ...).
      * @param urlData (Optionally) Data object to resolve parameters from the url in. If not set, uses the data object, if that's not set it rejects.
      * @param headers (Optionally) Extra headers to set on the request.
+     * @param mask (Optionally) A list of JSON-Pointers that describe what fields should be included in the response, in order to reduce response data size. (May be ignored by agent)
      *
      * @return An promise resolving into the decoded response from the server/service/remote.
      */
-    public execute<TRequest, TResponse>(link: SchemaHyperlinkDescriptor, data?: TRequest, urlData?: IdentityValues, headers?: HeaderDictionary): Promise<SchemaAgentResponse<TResponse>> {
+    public execute<TRequest, TResponse>(
+        link: SchemaHyperlinkDescriptor,
+        data?: TRequest,
+        urlData?: IdentityValues,
+        headers?: HeaderDictionary,
+        mask?: string[]
+    ): Promise<SchemaAgentResponse<TResponse>> {
         debug(`preparing [${this.schema.root.id}].links.${link.rel}`);
 
         // Resolve the request schema
@@ -143,9 +150,12 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
                 }
 
                 // Get the headers
-                let requestHeaders = _.assign<any, HeaderDictionary, HeaderDictionary>({}, this.headers, headers);
+                let requestHeaders = Object.assign<any, HeaderDictionary, HeaderDictionary>({}, this.headers, headers);
                 if (!!this.authenticator) {
                     requestHeaders = this.authenticator.authenticateRequest(requestHeaders);
+                }
+                if (mask && Array.isArray(mask)) {
+                    requestHeaders['x-mask'] = mask.join(',');
                 }
 
                 // Create the config
@@ -178,7 +188,7 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
                     first: any;
 
                 // If the object only contains one item that is an object, just return that as the object.
-                if (_.isObject(xhr.data) && _.size(xhr.data as any) === 1 && (_.isPlainObject(first = _.find(xhr.data as any, x => true)) || _.isArray(first))) {
+                if (_.isObject(xhr.data) && _.size(xhr.data as any) === 1 && (_.isPlainObject(first = _.find(xhr.data as any, x => true)) || Array.isArray(first))) {
                     body = first;
                 }
 
@@ -249,10 +259,11 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
      *
      * @param identity The identity-value(s) of the entity item to read/fetch, will be used to find variable-ref values in the url.
      * @param linkName The name of the link to use to read the item with.
+     * @param mask (Optionally) A list of JSON-Pointers that describe what fields should be included in the response, in order to reduce response data size. (May be ignored by agent)
      *
      * @return An promise that resolves into the requested entity, and adheres to the set link schema, if it is set.
      */
-    public read<T>(identity: EntityIdentity, linkName?: string): Promise<T> {
+    public read<T>(identity: EntityIdentity, linkName?: string, mask?: string[]): Promise<T> {
         // Try to fetch the link name
         let link = this.chooseAppropriateLink([
             'read', // The name this library propagates.
@@ -277,7 +288,7 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
         }
 
         // Execute the request
-        return this.execute<any, T>(link, void 0, urlData)
+        return this.execute<any, T>(link, void 0, urlData, void 0, mask)
             .then(response => {
                 //@todo validate response.
                 return response.body;
