@@ -33,3 +33,4 @@ export * from './agents/endpoint-schema-agent';
 export * from './agents/value-schema-agent';
 
 export * from './helpers/agent-throttle';
+export * from './helpers/json-pointer/index';
