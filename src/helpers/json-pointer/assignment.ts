@@ -26,11 +26,17 @@ export function pointerSet(data: any, pointer: string | string[], value: any, ro
 
     return iteratePointer(data, pntrParts, (current, key, targetPointer) => {
         if (pntrMod === '#') {
-            if (Array.isArray(value)) {
-
+            if (typeof current[key] !== 'object') {
+                current[key] = {};
             }
-            else {
-                current[]
+
+            if (Array.isArray(value)) {
+                for (var k of value) {
+                    current[key][String(k)] = {};
+                }
+            }
+            else if (!(String(value) in current[key])) {
+                current[key][String(value)] = {};
             }
         }
         else {
@@ -61,17 +67,28 @@ export function pointerCopy(source: any, pointer: string | string[], target: any
         var val = current[key] as any;
         if (pntrMod === '#') {
             if (typeof val === 'object') {
-                val = { };
+                val = Object.keys(val);
             }
             else if (Array.isArray(val)) {
                 val = [];
+                for (var i = 0; i < val.length; i++) {
+                    if (typeof val[i] === 'object') {
+                        val.push({});
+                    }
+                    else if (Array.isArray(val[i])) {
+                        val.push([]);
+                    }
+                    else {
+                        val.push(void 0);
+                    }
+                }
             }
             else {
                 val = void 0;
             }
         }
 
-        return pointerSet(target, targetPointer, val)[0];
+        return pointerSet(target, createPointer(targetPointer) + (pntrMod == null ? '' : pntrMod), val)[0];
     }, void 0, false, false);
 
     return target;

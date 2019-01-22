@@ -25,6 +25,14 @@ export function pointerInclusionMask(data: any, pointers: string[], root?: strin
     var result = {};
     for (var pointer of pointers) {
         try {
+            // skip key pointers if there are other masked pointers that already use a value/sub-pointer of the given key
+            if (pointer.endsWith('#')) {
+                var pntr = pointer.substr(0, pointer.length - 1) + '/*';
+                if (pointers.some(x => x !== pointer && x.startsWith(pntr))) {
+                    continue;
+                }
+            }
+
             pointerCopy(data, pointer, result, root);
         }
         catch (e) {
