@@ -24,7 +24,15 @@ export function pointerExclusionMask(data: any, pointers: string[], root?: strin
 export function pointerInclusionMask(data: any, pointers: string[], root?: string): any {
     var result = {};
     for (var pointer of pointers) {
-        pointerCopy(data, pointer, result, root);
+        try {
+            pointerCopy(data, pointer, result, root);
+        }
+        catch (e) {
+            /* if it doesnt exist, it doesnt matter... */
+            if (!(e && typeof e.message === 'string' && e.message.indexOf('does not exist') >= 0)) {
+                throw e;
+            }
+        }
     }
     return result;
 }

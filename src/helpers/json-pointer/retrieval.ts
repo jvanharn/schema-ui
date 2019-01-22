@@ -1,6 +1,7 @@
-import { parsePointerRootAdjusted } from './parser';
+import { parsePointerRootAdjusted, createPointer } from './parser';
 
 import * as debuglib from 'debug';
+import { iteratePointer } from './iteration';
 const debug = debuglib('schema:agent:json-pointer:retrieval');
 
 /**
@@ -32,52 +33,14 @@ export function pointerGet(
         return parsed;
     }
 
-    var current = data;
-    for (var i = 0; i < parsed.length; i++) {
-        if (Array.isArray(current)) {
-            if (parsed[i] === '-') {
-                current = defaultGenerator('/' + parsed.slice(0, i - 1).join('/') + '/' + current.length, data);
-            }
-            if (parsed[i] === '*') {
-                if (current.length === 0) {
-                    current = defaultGenerator('/' + parsed.slice(0, i - 1).join('/') + '/' + current.length, data);
-                }
-                else {
-                    current = current[0];
-                }
-            }
-
-            var index = Number.parseInt(parsed[i], 10);
-            if (Number.isNaN(index)) {
-                throw new Error(`The given pointer "${pointer}" is NaN/not an index for array value (at part ${i}).`);
-            }
-            if (index > current.length) {
-                throw new Error(`The given pointer "${pointer}" is out of bounds for array value (at part ${i}).`);
-            }
-            current = current[index];
-        }
-        else if (typeof current === 'object') {
-            if (parsed[i] === '*') {
-                var keys = Object.keys(current);
-                if (keys.length === 0) {
-                    throw new Error(`The given pointer "${pointer}" does not exist (at part ${i}).`);
-                }
-                else {
-                    current = current[keys[0]];
-                }
-            }
-
-            if (!Object.prototype.hasOwnProperty.apply(current, [parsed[i]])) {
-                current = defaultGenerator('/' + parsed.slice(0, i).join('/'), data);
-            }
-            current = current[parsed[i]];
-        }
-        else {
-            throw new Error(`The given pointer "${pointer}" does not exist (at part ${i}).`);
-        }
-    }
-
-    return current;
+    return iteratePointer(
+        data, parsed[0],
+        (current, key) => {
+            return current[key];
+        },
+        (current, currentKey, nextKey, pointer) => {
+            return defaultGenerator(createPointer(pointer), current)
+        }, false, true, 1)[0];
 }
 
 /**
@@ -99,68 +62,7 @@ export function pointerGetAll(data: any, pointer: string, root: string = '/', li
         return [parsed];
     }
 
-    var current = data;
-    for (var i = 0; i < parsed.length; i++) {
-        if (Array.isArray(current)) {
-            if (parsed[i] === '-') {
-                throw new Error(`The given pointer "${pointer}" does not exist (at part ${i}).`);
-            }
-            if (parsed[i] === '*') {
-                if (current.length === 0) {
-                    return [];
-                }
-                else {
-                    var result: any[] = [];
-                    var prefix = '/' + parsed.slice(0, i - 1).join('/') + '/';
-                    for (var k = 0; k < current.length; k++) {
-                        result.concat(pointerGetAll(data, prefix + k, root, limit));
-                        if (result.length >= limit) {
-                            return result.splice(0, limit);
-                        }
-                    }
-                    return result;
-                }
-            }
-
-            var index = Number.parseInt(parsed[i], 10);
-            if (Number.isNaN(index)) {
-                throw new Error(`The given pointer "${pointer}" is NaN/not an index for array value (at part ${i}).`);
-            }
-            if (index > current.length) {
-                throw new Error(`The given pointer "${pointer}" is out of bounds for array value (at part ${i}).`);
-            }
-            current = current[index];
-        }
-        else if (typeof current === 'object') {
-            if (parsed[i] === '*') {
-                var keys = Object.keys(current);
-                if (keys.length === 0) {
-                    return [];
-                }
-                else {
-                    var result: any[] = [];
-                    var prefix = '/' + parsed.slice(0, i - 1).join('/') + '/';
-                    for (var key of keys) {
-                        result.concat(pointerGetAll(data, prefix + key, root, limit));
-                        if (result.length >= limit) {
-                            return result.splice(0, limit);
-                        }
-                    }
-                    return result;
-                }
-            }
-
-            if (!Object.prototype.hasOwnProperty.apply(current, [parsed[i]])) {
-                throw new Error(`The given pointer "${pointer}" does not exist (at part ${i}).`);
-            }
-            current = current[parsed[i]];
-        }
-        else {
-            throw new Error(`The given pointer "${pointer}" does not exist (at part ${i}).`);
-        }
-    }
-
-    return [current];
+    return iteratePointer(data, parsed[0], (current, key) => current[key], void 0, false, false, limit);
 }
 
 /**

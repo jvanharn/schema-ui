@@ -5,6 +5,7 @@
 
  export * from './tests';
  export * from './parser';
+ export * from './iteration';
  export * from './retrieval';
  export * from './assignment';
  export * from './masking';

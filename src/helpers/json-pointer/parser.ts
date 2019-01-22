@@ -26,15 +26,29 @@ export function parsePointer(pointer: string): [PointerRoot, PointerParts, Point
         }
     }
 
+    // Check if there is a key selector in the last part
+    var modifier: PointerModifier = null;
+    var last = decoded[decoded.length - 1];
+    if (decoded[decoded.length - 1].substr(-1) === '#') {
+        modifier = '#';
+
+        if (last.substr.length > 1) {
+            decoded[decoded.length - 1] = last.substr(0, last.length - 1);
+        }
+        else {
+            decoded.pop();
+        }
+    }
+
     // Base JSON spec
     if (root === '' || root == null) {
-        return [null, decoded, null];
+        return [null, decoded, modifier];
     }
 
     // Relative pointer
     var num = Number.parseInt(root, 10);
     if (!Number.isNaN(num)) {
-        return [num, decoded, null];
+        return [num, decoded, modifier];
     }
 
     // Unknown pointer type.
@@ -44,16 +58,23 @@ export function parsePointer(pointer: string): [PointerRoot, PointerParts, Point
 /**
  * Splits and adjusts the given pointer for the given root pointer.
  *
- * @param pointer
+ * @param pointer The pointer to adjust for the given root, or an already parsed array of pointer elements.
  * @param rootPointer The root pointer to which the pointer parts will be adjusted.
  *
  * @return If the pointer is a relative pointer, and it requested the key, it will return a single key. If not if will return the concatenated/adjusted pointer parts to navigate through.
  */
-export function parsePointerRootAdjusted(pointer: string, rootPointer: string): PointerParts | string {
+export function parsePointerRootAdjusted(pointer: string | string[], rootPointer: string): [PointerParts, PointerModifier] | string {
+    // Already parsed
+    if (Array.isArray(pointer)) {
+        return [pointer, null];
+    }
+
     // Parse the pointer itself, and check whether it is root relative.
     var [pntrRoot, pntrParts, pntrMod] = parsePointer(pointer);
+
+    // No relativity
     if (pntrRoot === null) {
-        return pntrParts;
+        return [pntrParts, pntrMod];
     }
 
     // Parse the root too, since well need to process it.
@@ -77,7 +98,27 @@ export function parsePointerRootAdjusted(pointer: string, rootPointer: string): 
 
     // Fetch the value, adjust the root pointer
     if (pntrRoot === rootParts.length) {
-        return pntrParts;
+        return [pntrParts, pntrMod];
     }
-    return rootParts.slice(0, pntrRoot).concat(pntrParts);
+    return [rootParts.slice(0, pntrRoot).concat(pntrParts), pntrMod];
+}
+
+/**
+ * Encode an array of json-pointer parts to a JSON-Pointer.
+ *
+ * @param parts
+ * @param leadingSlash
+ *
+ * @return Correctly encoded JSON Pointer.
+ */
+export function createPointer(parts: string[], leadingSlash?: boolean): string {
+    if (!Array.isArray(parts)) {
+        throw new Error('Expected the parts to be an array.');
+    }
+    if (parts.length === 0) {
+        return leadingSlash ? '/' : '';
+    }
+
+    const pntr = '/' + parts.map(part => part.replace('~1', '/').replace('~0', '~')).join('/');
+    return leadingSlash ? pntr + '/' : pntr;
 }
