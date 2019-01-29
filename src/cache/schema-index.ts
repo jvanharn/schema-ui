@@ -62,7 +62,12 @@ export class SchemaIndex implements ISchemaCache {
      * @inherit
      */
     public removeSchema(id: string): void {
-        this.removeSchema(id);
+        if (this.index[id]) {
+            delete this.index[id];
+        }
+        else {
+            this.cache.removeSchema(id);
+        }
     }
 
     /**
