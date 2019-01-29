@@ -3,9 +3,10 @@ import * as pointer from 'json-pointer';
 import * as debuglib from 'debug';
 const debug = debuglib('schema:utils');
 
-import { JsonSchema, CommonJsonSchema } from '../models/index';
+import { JsonSchema, CommonJsonSchema, SchemaPropertyMap, JsonFormSchema, JsonTableSchema } from '../models/index';
 import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
+import { createPointer } from '../helpers/json-pointer';
 
 /**
  * Fixes common mistakes in JsonPointers.
@@ -131,6 +132,90 @@ export function getApplicablePropertyDefinitions(schema: JsonSchema, propertyPat
     //@todo support anyOf, allOf, local-$ref-erences, ...
 
     throw new Error(`Cannot find any way to navigate for path "${propertyPath}" and schema path "${schemaPathPrefix}"!`);
+}
+
+/**
+ * Get a list all applicable json schema definitions for the given property path.
+ *
+ * @param schema The schema to give the paths for.
+ * @param propertyPath The path to the property in the object that can be validated by the given schema.
+ * @param schemaPathPrefix
+ *
+ * @return List of all schema-relative paths that apply to the given property.
+ */
+export function filterSchema(schema: JsonSchema, callback: (pointer: string, current?: JsonSchema) => boolean, prefix: string[] = [], result: JsonSchema = {}): JsonSchema {
+    var copyProps = (source: any, target: any) => {
+        var sourceKeys = Object.getOwnPropertyNames(source);
+        for (var key of sourceKeys) {
+            if (key !== 'columns' && key !== 'properties' && key !== 'patternProperties' && key !== 'items' && key !== 'anyOf' && key !== 'allOf') {
+                target[key] = _.clone(source[key]);
+            }
+        }
+    };
+    copyProps(schema, result);
+
+    if (!!schema.properties) {
+        result.properties = {} as SchemaPropertyMap<JsonSchema>;
+
+        var sourceProps = Object.getOwnPropertyNames(schema.properties);
+        for (let prop of sourceProps) {
+            let current = prefix.concat([prop]);
+            if (callback(createPointer(current), schema.properties[prop])) {
+                filterSchema(schema.properties[prop], callback, current, result.properties[prop] = {});
+            }
+        }
+    }
+    if (!!schema.patternProperties) {
+        result.patternProperties = {} as SchemaPropertyMap<JsonSchema>;
+        var sourcePatterns = Object.getOwnPropertyNames(schema.patternProperties);
+        for (let pattern of sourcePatterns) {
+            let current = prefix.concat([pattern]);
+            if (callback(createPointer(current), schema.patternProperties[pattern])) {
+                filterSchema(schema.patternProperties[pattern], callback, current, result.patternProperties[pattern] = {});
+            }
+        }
+    }
+
+    if (schema.items != null) {
+        if (Array.isArray(schema.items)) {
+            result.items = [];
+            for (let i=0; i < schema.items.length; i++) {
+                let current = prefix.concat([String(i)]);
+                if (callback(createPointer(current), schema.items[i])) {
+                    filterSchema(schema.items[i], callback, current, (result.items as JsonSchema[])[i] = {});
+                }
+            }
+        }
+        else if (typeof schema.items === 'object') {
+            if (callback(createPointer(prefix), schema.items as JsonSchema)) {
+                filterSchema(schema.items as JsonSchema, callback, prefix.slice(), result.items = {})
+            }
+        }
+    }
+
+    if (!!schema.allOf) {
+        result.allOf = [];
+        for (let i=0; i < schema.allOf.length; i++) {
+            if (callback(createPointer(prefix), schema.allOf[i])) {
+                filterSchema(schema.allOf[i], callback, prefix, (result.allOf as JsonSchema[])[i] = {});
+            }
+        }
+    }
+
+    if (!!schema.anyOf) {
+        result.anyOf = [];
+        for (let i=0; i < schema.anyOf.length; i++) {
+            if (callback(createPointer(prefix), schema.anyOf[i])) {
+                filterSchema(schema.anyOf[i], callback, prefix, (result.anyOf as JsonSchema[])[i] = {});
+            }
+        }
+    }
+
+    if ((schema as JsonTableSchema).columns) {
+        (result as JsonTableSchema).columns = (schema as JsonTableSchema).columns.filter(x => callback(x.path || `/${x.id}`, void 0));
+    }
+
+    return result;
 }
 
 /**

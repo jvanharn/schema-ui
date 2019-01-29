@@ -839,7 +839,7 @@ export class SchemaNavigator {
      *
      * @return The priority of the given property as an identifying property.
      */
-    protected isIdentityProperty(name: string): 0 | 1 | 2 | 3 | 4 {
+    public isIdentityProperty(name: string): 0 | 1 | 2 | 3 | 4 {
         let lname = name.toLocaleLowerCase();
 
         if (this.isPrimaryIdentityProperty(name)) {
