@@ -447,9 +447,6 @@ export class SchemaNavigator {
          * Get the list of columns associated with this schema.
          */
         public get columns(): SchemaColumnDescriptor[] {
-            if (Array.isArray((this.root as JsonTableSchema).columns)) {
-                return (this.schema as JsonTableSchema).columns;
-            }
             return Array.isArray((this.schema as JsonTableSchema).columns)
                 ? (this.schema as JsonTableSchema).columns
                 : this.generateColumns();
