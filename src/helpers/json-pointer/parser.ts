@@ -119,6 +119,6 @@ export function createPointer(parts: string[], leadingSlash?: boolean): string {
         return leadingSlash ? '/' : '';
     }
 
-    const pntr = '/' + parts.map(part => part.replace('~1', '/').replace('~0', '~')).join('/');
+    const pntr = '/' + parts.map(part => String(part || '').replace('~1', '/').replace('~0', '~')).join('/');
     return leadingSlash ? pntr + '/' : pntr;
 }

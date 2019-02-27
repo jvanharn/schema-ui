@@ -726,7 +726,7 @@ export class SchemaNavigator {
                     }
 
                     var [subId, subPoint] = p.split('#');
-                    if (subId + '#' === this.schemaId) {
+                    if (subId === '' || subId + '#' === this.schemaId) {
                         return pointer.get(this.root, subPoint);
                     }
 
