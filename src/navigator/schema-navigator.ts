@@ -165,23 +165,36 @@ export class SchemaNavigator {
         }
 
         /**
+         * The property used to cache the sorted identities once calculated.
+         */
+        private _identityProperties: string[];
+
+        /**
          * Get's a list of all identity-like properties in the document. (Not only the main one)
+         *
+         * This list is sorted by it's identity score.
          */
         public get identityProperties(): string[] {
-            let props = this.propertyRoot,
-                identities: string[] = [];
+            if (this._identityProperties) {
+                return this._identityProperties;
+            }
+
+            var props = this.propertyRoot,
+                identities: [number, string][] = [],
+                score: number;
             for (let key in props) {
-                if (props.hasOwnProperty(key) && this.isIdentityProperty(key) < 4) {
-                    identities.push(key);
+                score = this.isIdentityProperty(key);
+                if (props.hasOwnProperty(key) && score < 4) {
+                    identities.push([score, key]);
                 }
             }
 
             // Always return an array with at least one item in it.
             if (identities.length < 1) {
-                return [this.identityProperty];
+                return this._identityProperties = [this.identityProperty];
             }
 
-            return identities;
+            return this._identityProperties = _.orderBy(identities, x => x[0]).map(x => x[1]);
         }
 
         /**
