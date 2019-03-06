@@ -294,6 +294,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
             var endIndex = page * this.limit;
             if (startIndex >= this._items.length) {
                 const err = new Error(`The given page number "${page}" is higher than the amount of pages in this cursor.`);
+                this.loadingState = CursorLoadingState.Error;
                 this.emit('error', err);
                 return Promise.reject(err);
             }

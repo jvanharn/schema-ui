@@ -271,6 +271,7 @@ export class EndpointCursor<T> extends EventEmitter implements ICursor<T>, ISear
                 })
                 .catch(err => {
                     debug(`error ocurred whilst trying to fetch page (${page}/${this.totalPages}) limit: ${this.limit} of [${this.agent.schema.root.id}].`);
+                    this.loadingState = CursorLoadingState.Error;
                     this.emit('error', err);
                     reject(err);
                 });

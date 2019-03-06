@@ -252,7 +252,7 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
                 return items;
             })
             .catch(err => {
-                this.loadingState = CursorLoadingState.Empty;
+                this.loadingState = CursorLoadingState.Error;
                 this.emit('error', err);
                 throw err;
             });

@@ -148,7 +148,12 @@ export enum CursorLoadingState {
     /**
      * The cursor is empty, and the collection doesn't contain any items.
      */
-    Empty
+    Empty,
+
+    /**
+     * The cursor errored out whilst attempting to load the page.
+     */
+    Error,
 }
 
 /**
