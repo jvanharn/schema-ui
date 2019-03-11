@@ -29,7 +29,7 @@ export function parsePointer(pointer: string): [PointerRoot, PointerParts, Point
     // Check if there is a key selector in the last part
     var modifier: PointerModifier = null;
     var last = decoded[decoded.length - 1];
-    if (decoded[decoded.length - 1].substr(-1) === '#') {
+    if (decoded.length > 0 && decoded[decoded.length - 1].substr(-1) === '#') {
         modifier = '#';
 
         if (last.substr.length > 1) {

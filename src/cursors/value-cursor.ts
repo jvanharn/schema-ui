@@ -506,7 +506,7 @@ export function sortCollectionBy<T>(collection: T[], sorters: CollectionSortDesc
     return _.orderBy(
         collection,
         _.map(sorters, x => _.trimStart(x.path, '/')),
-        _.map(sorters, x => ['asc', 'desc'][x.direction]));
+        _.map(sorters, x => ['asc', 'desc'][x.direction] as 'asc' | 'desc'));
 }
 
 /**
