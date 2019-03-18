@@ -700,7 +700,7 @@ export class SchemaNavigator {
          */
         public setIdentityValue(data: any, identity: IdentityValue | IdentityValues): any {
             if (_.isPlainObject(identity)) {
-                return this.setIdentityValues(data, identity as IdentityValues);
+                identity = this.getIdentityValue(identity as IdentityValues);
             }
 
             this.setPropertyValue(this.identityProperty, data, identity);
@@ -715,7 +715,7 @@ export class SchemaNavigator {
          */
         public setIdentityValues(data: any, identities: IdentityValues): any {
             for (var prop of this.identityProperties) {
-                this.setIdentityValues(data, this.getPropertyValue(prop, identities));
+                this.setPropertyValue(prop, data, this.getPropertyValue(prop, identities));
             }
             return data;
         }

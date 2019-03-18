@@ -545,7 +545,7 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
             urlData[this.schema.identityProperty] = identity as string;
         }
         else {
-            urlData = identity as IdentityValues;
+            urlData = this.schema.getIdentityValues(identity) as IdentityValues;
         }
 
         var props = _.keys(urlData);
