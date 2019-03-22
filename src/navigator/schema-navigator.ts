@@ -897,8 +897,12 @@ export class SchemaNavigator {
      * @param name The property name to identify.
      */
     protected isParentIdentityProperty(name: string): boolean {
-        var parents = this.entity.match(/[A-Z][a-z]+/g),
-            current = parents.pop().toLowerCase(),
+        var parents = _.upperFirst(this.entity).match(/[A-Z][a-z]+/g);
+        if (parents == null) {
+            return false;
+        }
+
+        var current = parents.pop().toLowerCase(),
             lname = name.toLowerCase().replace(/[^0-9a-z]/gi, '');
 
         // Check whether the property is a reference in a chained table.
