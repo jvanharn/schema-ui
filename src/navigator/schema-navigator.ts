@@ -597,6 +597,27 @@ export class SchemaNavigator {
                 return [key, this.propertyPrefix + key] as [string, string];
             }));
         }
+
+        /**
+         * Check whether the given link requires an instance of the object to be resolved (e.g. it has template pointers).
+         *
+         * @param link The link to check.
+         */
+        public hasLinkUriTemplatePointers(link: SchemaHyperlinkDescriptor): boolean {
+            if (link == null) {
+                return false;
+            }
+
+            if (typeof (link as any).templatePointers === 'object') {
+                return Object.keys((link as any).templatePointers).length > 0;
+            }
+
+            var keys = link.href.match(linkUriTemplateRegexp);
+            if (keys == null) {
+                return false;
+            }
+            return keys.length > 0;
+        }
     //endregion
 
     //region JSON-Pointer helpers
