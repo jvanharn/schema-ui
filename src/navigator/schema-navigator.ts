@@ -180,9 +180,12 @@ export class SchemaNavigator {
             }
 
             var props = this.propertyRoot,
-                identities: [number, string][] = [],
+                identities: [number, string][] = [[0, this.identityProperty]],
                 score: number;
             for (let key in props) {
+                if (key === this.identityProperty) {
+                    continue;
+                }
                 score = this.isIdentityProperty(key);
                 if (props.hasOwnProperty(key) && score < 4) {
                     identities.push([score, key]);
@@ -577,7 +580,7 @@ export class SchemaNavigator {
         /**
          * Get a mapping of uri keys to object pointers.
          *
-         * @param link
+         * @param link The link to get the pointers for.
          */
         public getLinkUriTemplatePointers(link: SchemaHyperlinkDescriptor): { [key: string]: string } {
             if ((link as any).templatePointers) {
