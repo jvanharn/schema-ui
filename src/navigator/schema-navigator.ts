@@ -781,6 +781,39 @@ export class SchemaNavigator {
                 return [];
             }
         }
+
+        /**
+         * Select the correct descriptor for the given value.
+         *
+         * Warning: Does not take into account required values, thus if the value is null, it will return the first descriptor.
+         *
+         * @param descriptors A list of possible descriptors for the field. (Call {@see getFieldDescriptorForPointer} to fetch this list)
+         * @param value The value to find a descriptor for.
+         *
+         * @return JSON Form Schema for the field, or null if no valid schema exists for the given value.
+         */
+        public getFieldDescriptorForValue(descriptors: JsonFormSchema[], value: any): JsonFormSchema | null {
+            var field: JsonFormSchema = null;
+            if (descriptors.length === 1 && value == null) {
+                field = descriptors[0];
+            }
+            else if (typeof value === 'string') {
+                field = descriptors.find(x => x.type === 'string');
+            }
+            else if (typeof value === 'number') {
+                field = descriptors.find(x => x.type === 'integer' || x.type === 'number');
+            }
+            else if (Array.isArray(value)) {
+                var arr = descriptors.find(x => x.type === 'array');
+                if (typeof arr.items === 'object') {
+                    field = arr.items as JsonFormSchema;
+                    if (typeof field.field !== 'object' && typeof arr.field === 'object') {
+                        field.field = arr.field;
+                    }
+                }
+            }
+            return field;
+        }
     //endregion
 
     /**
