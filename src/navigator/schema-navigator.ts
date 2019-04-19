@@ -217,8 +217,19 @@ export class SchemaNavigator {
          * @throws Error When the schema id and entity name are not set.
          */
         public get entity(): string | null {
-            return getSchemaEntity(this.root) || getSchemaEntity(this.schema);
+            if (this._entity) {
+                return this.entity;
+            }
+            return this._entity = getSchemaEntity(this.root) || getSchemaEntity(this.schema);
         }
+        public set entity(entity: string | null) {
+            this._entity = entity;
+        }
+
+        /**
+         * Cached version of the above entity name fetcher.
+         */
+        private _entity: string | null;
     //endregion
 
     //region JsonFormSchema Helpers
