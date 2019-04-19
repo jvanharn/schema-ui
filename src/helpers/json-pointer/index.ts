@@ -10,3 +10,4 @@
  export * from './assignment';
  export * from './masking';
  export * from './matching';
+ export * from './compiler';
