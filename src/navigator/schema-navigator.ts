@@ -218,7 +218,7 @@ export class SchemaNavigator {
          */
         public get entity(): string | null {
             if (this._entity) {
-                return this.entity;
+                return this._entity;
             }
             return this._entity = getSchemaEntity(this.root) || getSchemaEntity(this.schema);
         }
@@ -511,18 +511,22 @@ export class SchemaNavigator {
     //endregion
 
     //region Json Hyperschema Helpers
+        private _links: SchemaHyperlinkDescriptor[];
+
         /**
          * Get all schema hyperlinks.
          */
         public get links(): SchemaHyperlinkDescriptor[] {
-            var lnk: any[] = [];
-            if (_.isArray(this.root.links)) {
-                lnk = lnk.concat(this.root.links);
+            if (!this._links) {
+                this._links = [];
+                if (Array.isArray(this.root.links)) {
+                    Array.prototype.push.apply(this._links, this.root.links);
+                }
+                if (Array.isArray(this.schema.links) && this.schema.links !== this.root.links) {
+                    Array.prototype.push.apply(this._links, this.schema.links);
+                }
             }
-            if (_.isArray(this.schema.links) && this.schema.links !== this.root.links) {
-                lnk = lnk.concat(this.schema.links);
-            }
-            return lnk;
+            return this._links;
         }
 
         /**
