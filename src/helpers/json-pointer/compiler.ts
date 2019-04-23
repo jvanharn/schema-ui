@@ -1,4 +1,4 @@
-import { parsePointerRootAdjusted } from './parser';
+import { parsePointerRootAdjusted, createPointer } from './parser';
 import { PointerDefaultValueGenerator } from './retrieval';
 
 /**
@@ -26,17 +26,18 @@ export function compilePointerGet(
     var pntr = parsed[0];
     for (var i = 0; i < pntr.length; i++) {
         isLast = pntr.length === i + 1;
-        sourceCode += `\n// index(${i}) = ${pntr[i]}\nkey = ${JSON.stringify(pntr[i])};\n`;
+        sourceCode += `\n// index(${i}) = ${pntr[i]}\n`;
+        var currentKey = JSON.stringify(pntr[i]);
 
         if (pntr[i] === '-') {
             throw new Error(`The given pointer "${pointer}" is not valid for a read-only operation; ` +
                 'the special dash dash-part (-) always indicates a non-existing element');
         }
-        if (pntr[i] === '*') {
+        else if (pntr[i] === '*') {
             sourceCode += `
 if (Array.isArray(current)) {
     if (current.length > 0) {
-        key = '0';
+        ${generateGetOrDefault('\'0\'', createPointer(pntr.slice(0, i + 1), true))}
     }
     else {
         throw new Error(\`The given pointer "${pointer}" does not exist (at part ${i}).\`);
@@ -45,7 +46,7 @@ if (Array.isArray(current)) {
 else {
     var keys = Object.keys(current);
     if (keys.length > 0) {
-        key = keys[0];
+        ${generateGetOrDefault('keys[0]', createPointer(pntr.slice(0, i + 1), true))}
     }
     else {
         throw new Error(\`The given pointer "${pointer}" does not exist (at part ${i}).\`);
@@ -53,42 +54,29 @@ else {
 }
 `;
         }
-
-        var curKey = Number.parseInt(pntr[i], 10);
-        if (Number.isNaN(curKey)) {
-            sourceCode += `
+        else {
+            var curKey = Number.parseInt(pntr[i], 10);
+            if (Number.isNaN(curKey)) {
+                sourceCode += `
 if (Array.isArray(current)) {
     throw new Error(\`The given pointer "${pointer}" is NaN/not an index for array value (at part ${i}).\`);
 }
 `;
-        }
-        else if (curKey < 0) {
-            sourceCode += `
+            }
+            else if (curKey < 0) {
+                sourceCode += `
 if (Array.isArray(current)) {
     throw new Error(\`The given pointer "${pointer}" is out of bounds for array value (at part ${i}).\`);
 }
 `;
-        }
-
-        if (isLast) {
-            sourceCode += `return current[key];\n`;
-        }
-        else {
-            var nextKey: string | number = Number.parseInt(pntr[i + 1]);
-            if (Number.isNaN(nextKey)) {
-                nextKey = pntr[i + 1];
             }
-            sourceCode += `
-if (current[key] === void 0) {
-    current = generator(current, key, ${JSON.stringify(nextKey)}, ${JSON.stringify(pntr)});
-    if (current == null) {
-        return current;
-    }
-}
-else {
-    current = current[key];
-}
-`;
+
+            if (isLast) {
+                sourceCode += `return current[${currentKey}];\n`;
+            }
+            else {
+                sourceCode += generateGetOrDefault(currentKey, createPointer(pntr.slice(0, i + 1), true));
+            }
         }
 
         sourceCode += `//endof index(${i})\n`;
@@ -96,4 +84,23 @@ else {
 
     var compiled = new Function('generator', 'data', sourceCode);
     return function generatedPointerGetAccessor(data: any): any { return compiled(defaultGenerator, data); };
+}
+
+/**
+ * Generates a piece of code that either gets the given key, or calls a generate method to get a default.
+ * @param key The JS encoded key to fetch from (like: "something" or 1)
+ * @param pointer
+ */
+function generateGetOrDefault(key: string, pointer: string): string {
+    return `
+if (current[${key}] === void 0) {
+    current = generator(current, '${pointer}');
+    if (current == null) {
+        return current;
+    }
+}
+else {
+    current = current[${key}];
+}
+`;
 }
