@@ -7,6 +7,8 @@ import { SchemaNavigator } from '../navigator/schema-navigator';
 
 import * as _ from 'lodash';
 import * as debuglib from 'debug';
+import { IMaskableCursor } from './maskable-cursor';
+import { pointerInclusionMask } from '../helpers/json-pointer';
 const debug = debuglib('schema:cursor:streaming');
 
 const maxBufferedItems = 2000;
@@ -22,7 +24,7 @@ const maxBufferedItems = 2000;
  * When starting this cursor at page 5 it will stream all pages preceding that page in order to build a reliable page-
  * map. This also applies if you change the filters on page 5 for example, as that requires rebuilding the pagemap.
  */
-export class StreamingCursor<T> extends EventEmitter implements IFilterableCursor<T>, ISortableCursor<T> {
+export class StreamingCursor<T> extends EventEmitter implements IFilterableCursor<T>, ISortableCursor<T>, IMaskableCursor<T> {
     /**
      * Map of our page numbers, to the ranges in the parent cursor.
      */
@@ -38,7 +40,12 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
      */
     public isParentSortable: boolean = false;
 
-//region get/set limit
+    /**
+     * Whether or not the parent cursor implements IMaskableCursor.
+     */
+    public isParentMaskable: boolean = false;
+
+//#region get/set limit
     public _current: number = null;
 
     /**
@@ -50,9 +57,9 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
         }
         return Math.max(this._current, 1);
     }
-//endregion
+//#endregion
 
-//region get/set limit
+//#region get/set limit
     public _limit: number = 40;
 
     /**
@@ -72,7 +79,7 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
         this.parent.limit = value;
         this.clearPageMap();
     }
-//endregion
+//#endregion
 
     /**
      * The total number of items in the parent resource.
@@ -145,9 +152,10 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
             this.select(parent.current);
         }
 
-        var cur = this.parent as (IFilterableCursor<T> & ISortableCursor<T>);
+        var cur = this.parent as (IFilterableCursor<T> & ISortableCursor<T> & IMaskableCursor<T>);
         this.isParentFilterable = (!!cur.filters && !!cur.filterBy && !!cur.clearFilter && !!cur.clearFilters);
         this.isParentSortable = (!!cur.sorters && !!cur.sortBy && !!cur.clearSort && !!cur.clearSorters);
+        this.isParentMaskable = ((cur.isMaskApplied === true || cur.isMaskApplied === false) && cur.mask !== void 0);
     }
 
     /**
@@ -238,7 +246,13 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
         return items
             .then(items => {
                 this._current = page;
-                this.items = items;
+                if (!this.isParentMaskable && this._mask.length > 0) {
+                    this.items = items.map(x => pointerInclusionMask(x, this._mask));
+                }
+                else {
+                    this.items = items;
+                }
+
                 if (this.parent.count > 0) {
                     this.loadingState = CursorLoadingState.Ready;
                 }
@@ -249,7 +263,7 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
                 // Emit after page change.
                 this.emit('afterPageChange', { page: this._current, items: this.items } as PageChangeEvent<T>);
 
-                return items;
+                return this.items;
             })
             .catch(err => {
                 this.loadingState = CursorLoadingState.Error;
@@ -370,10 +384,44 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
         });
     }
 
-    //region IFilterableCursor implementation
+    //#region IMaskableCursor implementation
+        public isMaskApplied: boolean = true;
+
+        //#region get/set mask
+            private _mask: string[] = [];
+
+            /**
+             * A list of JSON-Pointers that describe what fields should be included in the response, in order to reduce response data size. (Could ignored by agent)
+             */
+            public get mask(): string[] {
+                if (this.isParentMaskable) {
+                    return (this.parent as IMaskableCursor<T>).mask;
+                }
+                return this._mask;
+            }
+            public set mask(mask: string[]) {
+                if (!Array.isArray(mask) || mask == null) {
+                    mask = [];
+                }
+                else if (this._mask.length === mask.length && mask.every(x => this._mask.indexOf(x) >= 0)) {
+                    return;
+                }
+
+                if (this.isParentMaskable) {
+                    (this.parent as IMaskableCursor<T>).mask = mask;
+                }
+                else {
+                    this._mask = mask;
+                }
+                this.isMaskApplied = false;
+            }
+        //#endregion
+    //#endregion
+
+    //#region IFilterableCursor implementation
         public areFiltersApplied: boolean = true;
 
-        //region get/set filters
+        //#region get/set filters
             private _filters: CollectionFilterDescriptor[] = [];
 
             /**
@@ -382,7 +430,7 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
             public get filters(): CollectionFilterDescriptor[] {
                 return this._filters;
             }
-        //endregion
+        //#endregion
 
         /**
          * Filters the cursor's collection by the given filter(s) and applies them, and reload the current page.
@@ -435,15 +483,15 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
             }
             return this;
         }
-    //endregion
+    //#endregion
 
-    //region ISortableCursor implementation
+    //#region ISortableCursor implementation
         /**
          * Whether or not the last changes to the set sorters have already been applied.
          */
         public areSortersApplied: boolean = true;
 
-        //region get/set sorters
+        //#region get/set sorters
             private _sorters: CollectionSortDescriptor[] = [];
 
             /**
@@ -452,7 +500,7 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
             public get sorters(): CollectionSortDescriptor[] {
                 return this._sorters.slice();
             }
-        //endregion
+        //#endregion
 
         /**
          * Sorts the cursor's collection by the given sortable(s), applies them and reloads the current page.
@@ -511,7 +559,7 @@ export class StreamingCursor<T> extends EventEmitter implements IFilterableCurso
             }
             return this;
         }
-    //endregion
+    //#endregion
 
     /**
      * Reset the pagemap because a critical property is changed.
