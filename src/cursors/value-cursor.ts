@@ -6,18 +6,20 @@ import { SchemaColumnDescriptor } from '../models/table';
 import { JsonFormSchema } from '../models/form';
 import { ISearchableCursor } from './searchable-cursor';
 import { SchemaNavigator } from '../navigator/schema-navigator';
+import { IMaskableCursor } from './maskable-cursor';
 
 import { EventEmitter } from 'eventemitter3';
 import * as pointer from 'json-pointer';
 import * as _ from 'lodash';
 import * as debuglib from 'debug';
+import { pointerInclusionMask } from '../helpers/json-pointer';
 var debug = debuglib('schema:cursor:value');
 
 /**
  * Cursor that can iterate over a source array.
  */
-export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>, ISearchableCursor<T> {
-    //region get/set limit
+export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>, ISearchableCursor<T>, IMaskableCursor<T> {
+    //#region get/set limit
         protected _limit: number = 40;
 
         /**
@@ -38,9 +40,9 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
                 this.select(this.current);
             }
         }
-    //endregion
+    //#endregion
 
-    //region get/set current
+    //#region get/set current
         protected _current: number = null;
 
         /**
@@ -64,9 +66,9 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
                 debug('[warn] Setting the current page does not work when EndpointCursor.autoReload is set to false!');
             }
         }
-    //endregion
+    //#endregion
 
-    //region get/set count
+    //#region get/set count
         public _count: number = 0;
 
         /**
@@ -75,9 +77,9 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         public get count(): number {
             return this._count;
         }
-    //endregion
+    //#endregion
 
-    //region get/set totalPages
+    //#region get/set totalPages
         public _totalPages: number = null;
 
         /**
@@ -86,9 +88,9 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         public get totalPages(): number {
             return this._totalPages;
         }
-    //endregion
+    //#endregion
 
-    //region get/set items
+    //#region get/set items
         public _items: T[] = [];
 
         /**
@@ -97,9 +99,31 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         public get items(): T[] {
             return this._items;
         }
-    //endregion
+    //#endregion
 
-    //region get/set search
+    //#region get/set mask
+        private _mask: string[] = [];
+
+        /**
+         * A list of JSON-Pointers that describe what fields should be included in the response, in order to reduce response data size. (Could ignored by agent)
+         */
+        public get mask(): string[] {
+            return this._mask;
+        }
+        public set mask(mask: string[]) {
+            if (!Array.isArray(mask) || mask == null) {
+                mask = [];
+            }
+            else if (this._mask.length === mask.length && mask.every(x => this._mask.indexOf(x) >= 0)) {
+                return;
+            }
+
+            this._mask = mask;
+            this.isMaskApplied = false;
+        }
+    //#endregion
+
+    //#region get/set search
         /**
          * Currently active search terms.
          */
@@ -107,9 +131,9 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
             return this._terms;
         }
         protected _terms: string;
-    //endregion
+    //#endregion
 
-    //region get/set columns
+    //#region get/set columns
         /**
          * Set and get the columns for the cursor and set primaries
          */
@@ -126,9 +150,9 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
             this._columns = value.slice();
         }
         public _columns: SchemaColumnDescriptor[];
-    //endregion
+    //#endregion
 
-    //region get/set filters
+    //#region get/set filters
         /**
          * Filters set on this cursor/collection that limit the items in this cursor.
          */
@@ -136,9 +160,9 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
             return this._filters;
         }
         protected _filters: CollectionFilterDescriptor[] = [];
-    //endregion
+    //#endregion
 
-    //region get/set sorters
+    //#region get/set sorters
         /**
          * Sorters set on this cursor/collection that alter the ordering of the contained items.
          */
@@ -146,13 +170,18 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
             return this._sorters;
         }
         protected _sorters: CollectionSortDescriptor[] = [];
-    //endregion
+    //#endregion
 
     /**
      * Parameter is used to indicate that the cursor is loading.
      * @default CursorLoadingState.Uninitialized
      */
     public loadingState: CursorLoadingState = CursorLoadingState.Uninitialized;
+
+    /**
+     * Whether or not the last changes to the mask have been applied.
+     */
+    public isMaskApplied: boolean = true;
 
     /**
      * Whether or not the search terms were applied.
@@ -183,7 +212,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
 
     /**
      * @param _wrapped The wrapped collection.
-     * @param copyOnSelect Whether or not to copy objects when selecting.
+     * @param copyOnSelect Whether or not to copy objects when selecting. This will always be done if a mask has been set.
      */
     public constructor(
         public readonly schema: SchemaNavigator,
@@ -204,7 +233,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         }
     }
 
-//region Page changing
+//#region Page changing
     /**
      * Whether there's a page before the current one.
      */
@@ -301,7 +330,10 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
             this._items = _.slice(this._items, startIndex, endIndex);
 
             // Copy objects if needed
-            if (this.copyOnSelect && _.isObject(_.first(this._items))) {
+            if (this._mask.length > 0) {
+                this._items = this._items.map(x => pointerInclusionMask(x, this._mask));
+            }
+            else if (this.copyOnSelect && _.isObject(_.first(this._items))) {
                 this._items = this._items.map(x => _.assign({}, x));
             }
         }
@@ -311,13 +343,15 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         this.loadingState = this._items.length > 0 ? CursorLoadingState.Ready : CursorLoadingState.Empty;
         this.areFiltersApplied = true;
         this.areSortersApplied = true;
+        this.isSearchApplied = true;
+        this.isMaskApplied = true;
 
         // Emit after page change.
         this.emit('afterPageChange', { page: this._current, items: this.items } as PageChangeEvent<T>);
 
         return Promise.resolve(this.items);
     }
-//endregion
+//#endregion
 
     /**
      * @inherit
@@ -326,7 +360,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
         return getAllCursorPages(this);
     }
 
-    //region ISearchableCursor implementation
+    //#region ISearchableCursor implementation
         /**
          * Used to execute a page request with an active search filter.
          */
@@ -335,9 +369,9 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
             this.isSearchApplied = false;
             return this;
         }
-    //endregion
+    //#endregion
 
-    //region IFilterableCursor implementation
+    //#region IFilterableCursor implementation
         /**
          * Filters the cursor's collection by the given filter(s) and applies them, and reload the current page.
          *
@@ -392,9 +426,9 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
             }
             return this;
         }
-    //endregion
+    //#endregion
 
-    //region ISortableCursor implementation
+    //#region ISortableCursor implementation
         /**
          * Sorts the cursor's collection by the given sortable(s), applies them and reloads the current page.
          *
@@ -452,9 +486,9 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
             }
             return this;
         }
-    //endregion
+    //#endregion
 
-    //region IColumnizedCursor implementation
+    //#region IColumnizedCursor implementation
         /**
          * Sort the cursor by the given column name.
          *
@@ -496,7 +530,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
             });
             return this;
         }
-    //endregion
+    //#endregion
 }
 
 /**
