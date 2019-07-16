@@ -1,3 +1,5 @@
+import { EventEmitter } from 'eventemitter3';
+
 import { CursorLoadingState, PageChangeEvent, getAllCursorPages } from './cursor';
 import { CollectionFilterDescriptor, CollectionFilterOperator } from './filterable-cursor';
 import { CollectionSortDescriptor, SortingDirection } from './sortable-cursor';
@@ -7,12 +9,10 @@ import { JsonFormSchema } from '../models/form';
 import { ISearchableCursor } from './searchable-cursor';
 import { SchemaNavigator } from '../navigator/schema-navigator';
 import { IMaskableCursor } from './maskable-cursor';
+import { pointerInclusionMask, tryPointerGet } from '../helpers/json-pointer';
 
-import { EventEmitter } from 'eventemitter3';
-import * as pointer from 'json-pointer';
 import * as _ from 'lodash';
 import * as debuglib from 'debug';
-import { pointerInclusionMask } from '../helpers/json-pointer';
 var debug = debuglib('schema:cursor:value');
 
 /**
@@ -564,13 +564,7 @@ export function filterCollectionBy<T>(collection: T[], filters: CollectionFilter
         }
 
         // Fetch the collection value
-        var val: any;
-        try {
-            val = pointer.get(x, f.path);
-        }
-        catch (e) {
-            val = void 0;
-        }
+        var val: any = tryPointerGet(x, f.path);
 
         // If we have a schema, then we can normalize the values
         if (schema) {

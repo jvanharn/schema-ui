@@ -1,6 +1,5 @@
 import { EventEmitter, ListenerFn } from 'eventemitter3';
 
-import { JsonSchema } from '../models/schema';
 import { SchemaNavigator } from '../navigator/schema-navigator';
 
 import * as _ from 'lodash';
