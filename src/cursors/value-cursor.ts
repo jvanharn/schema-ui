@@ -202,7 +202,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
      * Whether or not the last changes to the set sorters/filters on columns have already been applied.
      */
     public get areColumnsApplied(): boolean {
-        return this.areFiltersApplied && this.areSortersApplied;
+        return this.areFiltersApplied && this.areSortersApplied && this.isMaskApplied;
     }
 
     /**
