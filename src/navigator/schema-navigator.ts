@@ -643,7 +643,7 @@ export class SchemaNavigator {
          * @return The value of the property or undefined if not set.
          */
         public getPropertyValue(name: string, data: any): any {
-            return tryPointerGet(data, this.getPropertyPointer(name));
+            return pointerGet(data, this.getPropertyPointer(name));
         }
 
         /**
