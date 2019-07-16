@@ -162,7 +162,7 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
                 let config: AxiosRequestConfig = {
                     // Resolve the url and set the url data.
                     url: this.rebaseSchemaHyperlinkHref(this.fillSchemaHyperlinkParameters(link.href, urlData || data)),
-                    method: link.method || 'GET',
+                    method: (link.method || 'GET') as any,
                     headers: requestHeaders,
                     paramsSerializer: function(params) {
                         return qs.stringify(params, { arrayFormat: 'indices' })

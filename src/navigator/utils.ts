@@ -1,12 +1,11 @@
 import * as _ from 'lodash';
-import * as pointer from 'json-pointer';
 import * as debuglib from 'debug';
 const debug = debuglib('schema:utils');
 
-import { JsonSchema, CommonJsonSchema, SchemaPropertyMap, JsonFormSchema, JsonTableSchema } from '../models/index';
+import { JsonSchema, CommonJsonSchema, SchemaPropertyMap, JsonTableSchema } from '../models/index';
 import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
-import { createPointer } from '../helpers/json-pointer';
+import { createPointer, tryPointerGet } from '../helpers/json-pointer';
 
 /**
  * Fixes common mistakes in JsonPointers.
@@ -298,7 +297,7 @@ export function resolveSchema(schemaId: string, resolver: (id: string) => JsonSc
         return schema;
     }
 
-    let sub = pointer.get(schema, path);
+    let sub = tryPointerGet(schema, path);
     if (!!sub && sub.$ref != null) {
         sub = resolver(sub.$ref);
     }

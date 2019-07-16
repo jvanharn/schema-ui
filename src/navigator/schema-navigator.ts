@@ -1,6 +1,4 @@
 import * as _ from 'lodash';
-import * as pointer from 'json-pointer';
-
 import * as debuglib from 'debug';
 var debug = debuglib('schema:navigator');
 
@@ -8,7 +6,6 @@ import {
     JsonSchema,
     JsonFormSchema,
     JsonTableSchema,
-    CommonJsonSchema,
     SchemaPropertyMap,
     SchemaDataPointerMap,
 
@@ -26,6 +23,7 @@ import {
     getSchemaEntity,
     resolveAndMergeSchemas
 } from './utils';
+import { tryPointerGet, pointerSet, pointerGet } from '../helpers/json-pointer';
 
 /**
  * The default fieldset name, if none is defined.
@@ -645,7 +643,7 @@ export class SchemaNavigator {
          * @return The value of the property or undefined if not set.
          */
         public getPropertyValue(name: string, data: any): any {
-            return pointer.get(data, this.getPropertyPointer(name));
+            return tryPointerGet(data, this.getPropertyPointer(name));
         }
 
         /**
@@ -656,7 +654,7 @@ export class SchemaNavigator {
          * @param value The value of the property.
          */
         public setPropertyValue(name: string, data: any, value: any): void {
-            pointer.set(data, this.getPropertyPointer(name), value);
+            pointerSet(data, this.getPropertyPointer(name), value);
         }
 
         /**
@@ -685,10 +683,10 @@ export class SchemaNavigator {
          */
         public getIdentityValue(data: any): IdentityValue {
             try {
-                return pointer.get(data, this.identityPointer);
+                return pointerGet(data, this.identityPointer);
             }
             catch (e) {
-                return pointer.get(data, this.identityPointer.substr(this.propertyPrefix.length - 1));
+                return pointerGet(data, this.identityPointer.substr(this.propertyPrefix.length - 1));
             }
         }
 
@@ -700,12 +698,7 @@ export class SchemaNavigator {
          * @return Whether or not the identity value is set to a non null/undefined value.
          */
         public hasIdentityValue(data: any): boolean {
-            try {
-                return pointer.has(data, this.identityPointer);
-            }
-            catch (e) {
-                return false;
-            }
+            return tryPointerGet(data, this.identityPointer) != null;
         }
 
         /**
@@ -774,17 +767,17 @@ export class SchemaNavigator {
                 return schemas.map(p => {
                     var splitter = p.indexOf('#');
                     if (splitter === -1) {
-                        return pointer.get(this.root, p);
+                        return pointerGet(this.root, p);
                     }
 
                     var [subId, subPoint] = p.split('#');
                     if (subId === '' || subId + '#' === this.schemaId) {
-                        return pointer.get(this.root, subPoint);
+                        return pointerGet(this.root, subPoint);
                     }
 
                     var subSchema = this.getSchema(subId + '#');
                     if (subSchema != null) {
-                        return pointer.get(subSchema, subPoint);
+                        return pointerGet(subSchema, subPoint);
                     }
 
                     debug(`getFieldDescriptorForPointer: unable to find/retrieve the schema with id "${subId}#"`);
@@ -870,7 +863,7 @@ export class SchemaNavigator {
         }
 
         if (schemaId[0] === '#') {
-            return pointer.get(this.schema, fixJsonPointerPath(schemaId.substr(1)));
+            return pointerGet(this.schema, fixJsonPointerPath(schemaId.substr(1)));
         }
 
         if (!_.includes(schemaId, '#')) {
@@ -887,7 +880,7 @@ export class SchemaNavigator {
             return null;
         }
 
-        return pointer.get(this.schema, fixJsonPointerPath(sp));
+        return pointerGet(this.schema, fixJsonPointerPath(sp));
     }
 
     /**

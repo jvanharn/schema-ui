@@ -1,7 +1,6 @@
-import * as pointer from 'json-pointer';
-
 import { ISchemaCache } from './schema-cache';
 import { JsonSchema } from '../models/schema';
+import { pointerGet } from '../helpers/json-pointer';
 
 import * as debuglib from 'debug';
 var debug = debuglib('schema:cache:index');
@@ -39,7 +38,7 @@ export class SchemaIndex implements ISchemaCache {
         // Check the index.
         if (!!this.index[id]) {
             try {
-                return pointer.get(this.cache.getSchema(this.index[id][0]), this.index[id][1]);
+                return pointerGet(this.cache.getSchema(this.index[id][0]), this.index[id][1]);
             }
             catch (e) {
                 debug(`unable to get the subschema as pointed to by the schema index [${id}] (should not be able to happen)`);
