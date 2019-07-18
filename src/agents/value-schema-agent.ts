@@ -11,10 +11,7 @@ import {
     EntityIdentity
 } from '../models/index';
 import { ISchemaAgent, SchemaAgentResponse, SchemaAgentRejection, HeaderDictionary } from './schema-agent';
-import { IRelatableSchemaAgent } from './relatable-schema-agent';
-import { IAuthenticatedSchemaAgent } from './authenticated-schema-agent';
 import { AgentValidationError } from './endpoint-schema-agent';
-import { IAgentAuthenticator } from '../authenticators/agent-authenticator';
 import { ISchemaCache } from '../cache/schema-cache';
 import { ISchemaFetcher } from '../fetchers/schema-fetcher';
 import { ICursor } from '../cursors/cursor';
@@ -95,7 +92,7 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
         }
 
         // Get the identity schema
-        this.identitySchema = _.first(this.schema.getFieldDescriptorForPointer(this.schema.identityPointer));
+        this.identitySchema = (this.schema.getFieldDescriptorForPointer(this.schema.identityPointer) || []).shift();
 
         // Update the serial
         if (_wrapped != null && _wrapped.length > 0 && this.identitySchema && (this.identitySchema.type === 'integer' || this.identitySchema.type === 'number')) {
@@ -317,13 +314,13 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
         }
 
         // Find the item
-        var item = _.find(this._wrapped, this.itemMatcher(identity));
-        if (_.isObject(item)) {
-            item = _.assign({}, item);
+        var item = this._wrapped.find(this.itemMatcher(identity));
+        if (item != null && typeof item === 'object') {
+            item = Object.assign({}, item);
         }
 
         // Resolve
-        return Promise.resolve(item);
+        return Promise.resolve(item || null);
     }
 
     /**
@@ -410,12 +407,12 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
         }
 
         // Determine the source and target data types.
-        let sourcePatch = (_.isArray(data) && !_.isEmpty(data) && !!data[0].op),
+        let sourcePatch = (Array.isArray(data) && !_.isEmpty(data) && !!data[0].op),
             matcher = this.itemMatcher(identity);
 
         // Execute the update
         if (sourcePatch) {
-            var original = _.find(this._wrapped, matcher);
+            var original = this._wrapped.find(matcher);
             if (original) {
                 applyPatch(original, data as any, true, true);
                 return Promise.resolve(identity) as any;
@@ -455,7 +452,7 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
         // Execute the request
         var index = _.findIndex(this._wrapped, this.itemMatcher(identity));
         if (index >= 0) {
-            var removed = _.first(this._wrapped.splice(index, 1));
+            var removed = this._wrapped.splice(index, 1)[0];
             return Promise.resolve(this.schema.getIdentityValues(removed)) as any;
         }
         return Promise.reject({ code: 404, data: 'couldnt remove non-existent item' } as SchemaAgentRejection);
@@ -492,7 +489,7 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
      * Helper method to find the correct schema hyperlink for the job.
      */
     protected chooseAppropriateLink(defaults: string[], userRel?: string): SchemaHyperlinkDescriptor | null {
-        if (_.isString(userRel)) {
+        if (userRel != null && typeof userRel === 'string') {
             return this.schema.getLink(userRel);
         }
         return this.schema.getFirstLink(defaults);
@@ -548,7 +545,7 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
             urlData = this.schema.getIdentityValues(identity) as IdentityValues;
         }
 
-        var props = _.keys(urlData);
+        var props = Object.keys(urlData);
         return (item: any) => {
             for (let prop of props) {
                 if (item[prop] !== urlData[prop]) {
