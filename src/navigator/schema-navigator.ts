@@ -709,10 +709,13 @@ export class SchemaNavigator {
          * @return The identity property value dictionary.
          */
         public getIdentityValues(data: any): IdentityValues {
-            let result: IdentityValues = { };
+            var result: IdentityValues = { };
             for (var prop of this.identityProperties) {
                 try {
                     result[prop] = this.getPropertyValue(prop, data);
+                    if (result[prop] === void 0) {
+                        delete result[prop];
+                    }
                 }
                 catch (e) { /* */ }
             }
