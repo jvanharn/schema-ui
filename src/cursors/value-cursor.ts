@@ -331,7 +331,7 @@ export class ValueCursor<T> extends EventEmitter implements IColumnizedCursor<T>
 
             // Copy objects if needed
             if (this._mask.length > 0) {
-                this._items = this._items.map(x => pointerInclusionMask(x, this._mask));
+                this._items = this._items.map(x => pointerInclusionMask(x, this._mask.concat(this.schema.identityPointers)));
             }
             else if (this.copyOnSelect && _.isObject(_.first(this._items))) {
                 this._items = this._items.map(x => _.assign({}, x));
