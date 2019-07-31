@@ -154,7 +154,7 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
                 if (!!this.authenticator) {
                     requestHeaders = this.authenticator.authenticateRequest(requestHeaders);
                 }
-                if (mask && Array.isArray(mask)) {
+                if (mask && Array.isArray(mask) && mask.length > 0) {
                     requestHeaders['x-mask'] = mask.join(',');
                 }
 
