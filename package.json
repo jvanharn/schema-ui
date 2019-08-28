@@ -38,6 +38,6 @@
     "@types/qs": "^6.5.3",
     "@types/url-template": "^2.0.28",
     "rimraf": "^2.6.3",
-    "typescript": "3.4.x"
+    "typescript": "3.5.x"
   }
 }
