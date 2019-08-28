@@ -87,3 +87,37 @@ export function tryPointerGet(data: any, pointer: string, root?: string, default
         return void 0;
     }
 }
+
+/**
+ * Check whether or not the given pointer exists in it's entirety.
+ *
+ * @param data The data to check the pointers existence in.
+ * @param pointer The pointer to check.
+ * @param root A pointer that points to the contextual root, used for relative pointers.
+ */
+export function pointerHas(data: any, pointer: string, root: string = '/'): boolean {
+    try {
+        var parsed = parsePointerRootAdjusted(pointer, root);
+        if (typeof parsed === 'string') {
+            return false;
+        }
+
+        return iteratePointer(
+            data, parsed[0],
+            (current, key) => {
+                if (current != null && (
+                    (typeof current === 'object' && !Object.prototype.hasOwnProperty.call(current, key)) ||
+                    (Array.isArray(current) && key >= 0 && key < current.length))
+                ) {
+                    return current[key];
+                }
+                else {
+                    throw new Error();
+                }
+            },
+            () => { throw new Error() }, false, true, 1)[0];
+    }
+    catch {
+        return false;
+    }
+}
