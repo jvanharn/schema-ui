@@ -9,7 +9,7 @@
         "declaration": true,
         "declarationMap": true,
         "sourceMap": true,
-        "lib": ["es5", "es2015.promise", "es2015.core", "dom"],
+        "lib": ["es5", "es2015.promise", "es2015.iterable", "es2015.core", "dom"],
         "typeRoots": [
             "node_modules/@types"
         ],
