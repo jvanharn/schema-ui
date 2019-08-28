@@ -29,6 +29,7 @@
     "fast-json-patch": "^2.1.0",
     "lodash": "^4.17.14",
     "qs": "^6.5.2",
+    "tslib": "^1.10.0",
     "url-template": "^2.0.8"
   },
   "devDependencies": {
