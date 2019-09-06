@@ -38,6 +38,11 @@ var debug = debuglib('schema:endpoint:agent');
 export const jsonPatchMimeType = 'application/json-patch';
 
 /**
+ * Default request timeout (Same as nodejs' http-server).
+ */
+export const defaultRequestTimeout = 120000;
+
+/**
  * Schema interpreter and "hyper/media-link" agent.
  *
  * This class makes it possible to read a json-schema and load the links that are defined in it.
@@ -166,8 +171,19 @@ export class EndpointSchemaAgent implements ISchemaAgent, IRelatableSchemaAgent,
                     headers: requestHeaders,
                     paramsSerializer: function(params) {
                         return qs.stringify(params, { arrayFormat: 'indices' })
-                    }
+                    },
+                    timeout: defaultRequestTimeout,
                 };
+
+                // Check if a ttl header is set, if so apply to axios config.
+                if (requestHeaders['x-ttl']) {
+                    config.timeout = Math.max(parseInt(String(requestHeaders['x-ttl']), 10), 5000);
+                    delete requestHeaders['x-ttl'];
+                }
+                else if (requestHeaders['ttl']) {
+                    config.timeout = Math.max(parseInt(String(requestHeaders['ttl']), 10), 5000);
+                    delete requestHeaders['ttl'];
+                }
 
                 // Set the data
                 if (config.method.toUpperCase() === 'GET') {
