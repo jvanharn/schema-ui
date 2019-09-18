@@ -102,11 +102,11 @@ export function pointerHas(data: any, pointer: string, root: string = '/'): bool
             return false;
         }
 
-        return iteratePointer(
+        const result = iteratePointer(
             data, parsed[0],
             (current, key) => {
                 if (current != null && (
-                    (typeof current === 'object' && !Object.prototype.hasOwnProperty.call(current, key)) ||
+                    (typeof current === 'object' && Object.prototype.hasOwnProperty.call(current, key)) ||
                     (Array.isArray(current) && key >= 0 && key < current.length))
                 ) {
                     return current[key];
@@ -116,6 +116,8 @@ export function pointerHas(data: any, pointer: string, root: string = '/'): bool
                 }
             },
             () => { throw new Error() }, false, true, 1)[0];
+
+        return result !== void 0;
     }
     catch {
         return false;
