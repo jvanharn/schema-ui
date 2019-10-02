@@ -56,11 +56,17 @@ export function convertSchemaIdToEntityName(id: string): string {
  *
  * @param schema The schema to give the paths for.
  * @param propertyPath The path to the property in the object that can be validated by the given schema.
- * @param schemaPathPrefix
+ * @param referenceResolver Method to synchronously fetch any externally referenced schemas.
+ * @param schemaPathPrefix The prefix to unshift to the schema paths for each returned schema-relative pointer.
  *
  * @return List of all schema-relative paths that apply to the given property.
  */
-export function getApplicablePropertyDefinitions(schema: JsonSchema, propertyPath: string, referenceResolver?: (ref: string) => JsonSchema, schemaPathPrefix?: string): string[] {
+export function getApplicablePropertyDefinitions(
+    schema: JsonSchema,
+    propertyPath: string,
+    referenceResolver?: (ref: string) => JsonSchema,
+    schemaPathPrefix?: string
+): string[] {
     if (schemaPathPrefix == null) {
         if (String(schema.id).lastIndexOf('#') >= 0) {
             schemaPathPrefix = schema.id + '';
@@ -106,7 +112,7 @@ export function getApplicablePropertyDefinitions(schema: JsonSchema, propertyPat
                     sub,
                     '/' + cleaned.slice(1).join('/'),
                     referenceResolver,
-                    schemaPathPrefix + '/patternProperties/' + key)
+                    schemaPathPrefix + '/patternProperties/' + key);
             });
         }
     }
@@ -128,7 +134,25 @@ export function getApplicablePropertyDefinitions(schema: JsonSchema, propertyPat
         }
     }
 
-    //@todo support anyOf, allOf, local-$ref-erences, ...
+    if (schema.oneOf && Array.isArray(schema.oneOf)) {
+        return _.flatMap(schema.oneOf, (sub, key) => {
+            return getApplicablePropertyDefinitions(
+                sub,
+                '/' + cleaned.join('/'),
+                referenceResolver,
+                schemaPathPrefix + '/oneOf/' + key);
+        });
+    }
+    else if (schema.anyOf && Array.isArray(schema.anyOf)) {
+        return _.flatMap(schema.anyOf, (sub, key) => {
+            return getApplicablePropertyDefinitions(
+                sub,
+                '/' + cleaned.join('/'),
+                referenceResolver,
+                schemaPathPrefix + '/anyOf/' + key);
+        });
+    }
+    //@TODO: support allOf, local-$ref-erences, ...
 
     throw new Error(`Cannot find any way to navigate for path "${propertyPath}" and schema path "${schemaPathPrefix}"!`);
 }
