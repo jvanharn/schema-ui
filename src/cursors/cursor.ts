@@ -170,12 +170,21 @@ export interface PageChangeEvent<T> {
     items?: T[];
 }
 
+/**
+ * Helper method that fetches all items in an cursor, and returns the result as an array.
+ *
+ * @param cursor The cursor to iterate.
+ */
 export function getAllCursorPages<T>(cursor: ICursor<T>): Promise<T[]> {
     return new Promise((resolve, reject) => {
         var firstPage: Promise<T[]>;
         debug(`getAllCursorPages: fetching all pages of cursor for [${(cursor.constructor as any).name}]->{}`);
         if (cursor.loadingState > CursorLoadingState.Uninitialized) {
-            if (cursor.loadingState === CursorLoadingState.Ready) {
+            if (cursor.loadingState === CursorLoadingState.Empty) {
+                debug(`getAllCursorPages: cursor is empty`);
+                return resolve([]);
+            }
+            else if (cursor.loadingState === CursorLoadingState.Ready) {
                 debug(`getAllCursorPages: firstpage already loaded`);
                 firstPage = Promise.resolve(cursor.items);
             }
