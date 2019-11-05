@@ -367,7 +367,12 @@ export class ValueSchemaAgent<T> implements ISchemaAgent {
     public list<TItem>(page?: number, limit?: number, linkName?: string, urlData?: IdentityValues): Promise<ICursor<TItem>> {
         var cursor = new ValueCursor<TItem>(this.schema, this._wrapped as any, page);
         cursor.limit = limit;
-        return Promise.resolve(cursor);
+        if (page !== null) {
+            return cursor.select(page).then(() => cursor);
+        }
+        else {
+            return Promise.resolve(cursor);
+        }
     }
 
     /**
