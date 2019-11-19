@@ -97,9 +97,7 @@ export class LocalStorageSchemaCache implements ISchemaCache {
         // Create entry
         var entry: SchemaCacheEntry = {
             id: schema.id,
-            name: !!(schema as CommonJsonSchema).entity
-                ? this.getSchemaNameForSchemaEntity((schema as CommonJsonSchema).entity)
-                : this.getSchemaNameForSchemaId(schema.id)
+            name: this.getSchemaNameForSchemaId(schema.id)
         };
         this.schemas.push(entry);
 
@@ -170,6 +168,7 @@ export class LocalStorageSchemaCache implements ISchemaCache {
      */
     public clear(): void {
         if (!Array.isArray(this.schemas)) {
+            this.schemas = [];
             return;
         }
 
@@ -199,12 +198,16 @@ export class LocalStorageSchemaCache implements ISchemaCache {
                 return null;
             }
 
+            if (entry.schema != null) {
+                return entry.schema;
+            }
+
             var result = platformStorage.getItem(this.prefixStorageProperty(entry.name));
             if (result == null) {
                 return null;
             }
 
-            return JSON.parse(result);
+            return entry.schema = JSON.parse(result);
         }
 
         /**
@@ -234,15 +237,15 @@ export class LocalStorageSchemaCache implements ISchemaCache {
          * Saves the current rootlist (this.schemas) to the cache.
          */
         private saveSchemaList(): void {
+            const rootListKey = this.prefixStorageProperty(schemaCacheBucketRootList);
             try {
-                platformStorage.setItem(
-                    this.prefixStorageProperty(schemaCacheBucketRootList),
-                    JSON.stringify(this.schemas));
+                const rootSchemaList = this.schemas.map(x => x.id);
+                platformStorage.setItem(rootListKey, JSON.stringify(rootSchemaList));
             }
             catch (e) {
                 // If something goes wrong, just clear the cache to be sure everything stays working.
-                debug('[warn] couldnt cache the schema list, something went wrong:', e);
-                this.clear();
+                debug('[warn] couldnt cache the schema list, something went wrong (force cleared schemas root list to be shure):', e);
+                this.schemas = [];
             }
         }
 
@@ -250,9 +253,25 @@ export class LocalStorageSchemaCache implements ISchemaCache {
          * Loads the schemas from cache.
          */
         private loadSchemaList(): void {
-            var result = platformStorage.getItem(this.prefixStorageProperty(schemaCacheBucketRootList));
-            if (!!result) {
-                this.schemas = JSON.parse(result);
+            const rootListKey = this.prefixStorageProperty(schemaCacheBucketRootList);
+            debug(`loading root schema list from `);
+            try {
+                var result = platformStorage.getItem(rootListKey);
+                if (!!result) {
+                    const rootSchemaList: any[] = JSON.parse(result);
+                    this.schemas = rootSchemaList.map(item => {
+                        if (typeof item === 'string') {
+                            return { id: item, name: this.getSchemaNameForSchemaId(item) };
+                        }
+                        else {
+                            return item;
+                        }
+                    });
+                }
+            }
+            catch (err) {
+                debug(`[warn] something went wrong trying to reet the root schema cache list from key "${rootListKey}":`, err);
+                this.clear();
             }
         }
 
@@ -269,13 +288,6 @@ export class LocalStorageSchemaCache implements ISchemaCache {
         private getSchemaNameForSchemaId(schemaId: string): string {
             return _.kebabCase(schemaId.split('/').slice(2).join('-'));
         }
-
-        /**
-         * Get the entity name by making the entity name kebab-cased.
-         */
-        private getSchemaNameForSchemaEntity(schemaEntity: string): string {
-            return _.kebabCase(schemaEntity);
-        }
     //endregion
 }
 
@@ -289,4 +301,11 @@ interface SchemaCacheEntry {
      * Name of the schema.
      */
     name: string;
+
+    /**
+     * If already loaded in memory once, it is stored here, so we dont continue working on copies.
+     *
+     * (Reduces memory usage)
+     */
+    schema?: JsonSchema;
 }
