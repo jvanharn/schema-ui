@@ -93,6 +93,10 @@ export class SchemaIndex implements ISchemaCache {
      * @param prefix The JSON Pointer to prefix before schema pointers.
      */
     private fillIndexForSchema(schema: JsonSchema, schemaId?: string, prefix: string = '/'): void {
+        if (schema == null) {
+            debug(`[warn] tried to fill index for NULL schema!`);
+            return;
+        }
         if (schemaId == null) {
             schemaId = String(schema.id);
         }
