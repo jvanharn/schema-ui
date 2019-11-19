@@ -10,17 +10,17 @@ const schemaCacheBucketName = 'schemacache';
 const schemaCacheBucketRootList = 'root';
 
 //region LocalStorage Definition
-    declare interface Storage {
-        readonly length: number;
-        clear(): void;
-        getItem(key: string): string | null;
-        key(index: number): string | null;
-        removeItem(key: string): void;
-        setItem(key: string, data: string): void;
-        [key: string]: any;
-        [index: number]: string;
-    }
-    declare var window: { readonly localStorage: Storage, readonly sessionStorage: Storage };
+    // declare interface Storage {
+    //     readonly length: number;
+    //     clear(): void;
+    //     getItem(key: string): string | null;
+    //     key(index: number): string | null;
+    //     removeItem(key: string): void;
+    //     setItem(key: string, data: string): void;
+    //     [key: string]: any;
+    //     [index: number]: string;
+    // }
+    // declare var window: { readonly localStorage: Storage, readonly sessionStorage: Storage };
     declare var global: { readonly localStorage: Storage, readonly sessionStorage: Storage };
     if (typeof window !== 'undefined') {
         var platformStorage: Storage = window.localStorage || window.sessionStorage;
@@ -46,7 +46,26 @@ export class LocalStorageSchemaCache implements ISchemaCache {
         if (!platformStorage) {
             throw new Error('Cannot create a localStorage-based schema cache, because the localstorage is unavailable.');
         }
+
+        // Load the existing value into memory
         this.loadSchemaList();
+
+        // Try and register an event listener, for when the cache changes
+        try {
+            const that = this;
+            const rootListKey = this.prefixStorageProperty(schemaCacheBucketRootList);
+            window.addEventListener('storage', function localStorageSchemaCacheChangeListener(evt) {
+                if (evt.url === window.document.URL) {
+                    return;
+                }
+                if (evt.key === rootListKey) {
+                    that.loadSchemaList();
+                }
+            });
+        }
+        catch (err) {
+            debug('[warn] unable to register for storage change events:', err);
+        }
     }
 
     /**
@@ -57,7 +76,12 @@ export class LocalStorageSchemaCache implements ISchemaCache {
      * @return string
      */
     public getSchema(id: string): JsonSchema {
-        return this.getEntry(_.find(this.schemas, x => x.id.toLowerCase() === id.toLowerCase()));
+        if (!Array.isArray(this.schemas)) {
+            return null;
+        }
+
+        const lowerId = id.toLowerCase();
+        return this.getEntry(this.schemas.find(x => String(x.id).toLowerCase() === lowerId));
     }
 
     /**
@@ -90,7 +114,19 @@ export class LocalStorageSchemaCache implements ISchemaCache {
      * @inherit
      */
     public removeSchema(id: string): void {
-        this.clearEntry(_.find(this.schemas, x => x.id === id))
+        if (!Array.isArray(this.schemas)) {
+            return;
+        }
+
+        // Remove the schema itself
+        const lowerId = id.toLowerCase();
+        this.clearEntry(this.schemas.find(x => String(x.id).toLowerCase() === lowerId));
+
+        // Remove the entry from the schemas root listing
+        this.schemas = this.schemas.filter(x => x.id != lowerId);
+
+        // Save the listing
+        this.saveSchemaList();
     }
 
     /**
@@ -101,8 +137,8 @@ export class LocalStorageSchemaCache implements ISchemaCache {
      * @return JsonSchema
      */
     public getSchemaBy(predicate: (schema: JsonSchema) => boolean): JsonSchema {
-        for (var entry of this.schemas) {
-            let schema = this.getEntry(entry);
+        for (const entry of this.schemas) {
+            const schema = this.getEntry(entry);
             if (predicate(schema)) {
                 return schema;
             }
@@ -118,8 +154,14 @@ export class LocalStorageSchemaCache implements ISchemaCache {
      * @param predicate The operation that should be executed for every schema in the cache.
      */
     public each(predicate: (schema: JsonSchema) => void): void {
-        for (var entry of this.schemas) {
-            predicate(this.getEntry(entry));
+        for (const entry of this.schemas) {
+            const schema = this.getEntry(entry);
+            if (schema != null) {
+                predicate(schema);
+            }
+            else {
+                this.clearEntry(entry);
+            }
         }
     }
 
@@ -127,8 +169,14 @@ export class LocalStorageSchemaCache implements ISchemaCache {
      * Clear all cached entries.
      */
     public clear(): void {
+        if (!Array.isArray(this.schemas)) {
+            return;
+        }
+
         // Clear all items that are set in the root list
-        _.each(this.schemas, x => this.clearEntry(x));
+        for (const entry of this.schemas) {
+            this.clearEntry(entry);
+        }
 
         // Clear items that slipped out by manual editing or desynchronisation between tabs.
         for (var i = 0; i < platformStorage.length; i++) {
@@ -170,8 +218,12 @@ export class LocalStorageSchemaCache implements ISchemaCache {
          * Remove an entry from cache.
          */
         private clearEntry(entry?: SchemaCacheEntry | SchemaCacheEntry[]): void {
-            if (_.isArray(entry) && entry.length > 0) {
-                _.each(entry, x => !!x.name ? platformStorage.removeItem(x.name) : void 0);
+            if (Array.isArray(entry) && entry.length > 0) {
+                for (var item of entry) {
+                    if (!!item.name) {
+                        platformStorage.removeItem(item.name);
+                    }
+                }
             }
             else if (!!entry && !!(<SchemaCacheEntry>entry).name) {
                 platformStorage.removeItem((<SchemaCacheEntry>entry).name);
