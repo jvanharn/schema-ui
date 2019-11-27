@@ -112,7 +112,12 @@ export function pointerRemove(data: any, pointer: string, root: string = '/'): s
     }
 
     return iteratePointer(data, parsed[0], (current, key, pointer) => {
-        delete current[key];
+        if (Array.isArray(current) && typeof key === 'number' && Number.isInteger(key)) {
+            current.splice(key, 1);
+        }
+        else {
+            delete current[key];
+        }
         return createPointer(pointer);
     }, void 0, false, false);
 }
