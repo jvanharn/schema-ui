@@ -85,9 +85,10 @@ export function getApplicablePropertyDefinitions(
     }
 
     if (schema.$ref != null) {
-        schema = !!referenceResolver ? referenceResolver(schema.$ref) : null;
+        const schemaRef = schema.$ref;
+        schema = !!referenceResolver ? referenceResolver(schemaRef) : null;
         if (schema == null || _.isEmpty(schema)) {
-            throw new Error(`Encountered reference that could not resolved: [${schema.$ref}]`);
+            throw new Error(`Encountered reference that could not resolved: [${schemaRef}]`);
         }
         return getApplicablePropertyDefinitions(schema, '/' + cleaned.join('/'), referenceResolver);
     }
