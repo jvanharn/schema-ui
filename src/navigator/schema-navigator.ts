@@ -766,7 +766,11 @@ export class SchemaNavigator {
          */
         public getFieldDescriptorForPointer(dataPointer: string): JsonFormSchema[] {
             try {
-                var schemas = getApplicablePropertyDefinitions(this.root, dataPointer, this.getSchema.bind(this));
+                const schemas = getApplicablePropertyDefinitions(this.root, dataPointer, this.getSchema.bind(this));
+                if (schemas.length === 0) {
+                    return [{ } as JsonFormSchema];
+                }
+
                 return schemas.map(p => {
                     var splitter = p.indexOf('#');
                     if (splitter === -1) {

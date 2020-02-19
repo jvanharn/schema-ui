@@ -136,24 +136,53 @@ export function getApplicablePropertyDefinitions(
     }
 
     if (schema.oneOf && Array.isArray(schema.oneOf)) {
-        return _.flatMap(schema.oneOf, (sub, key) => {
-            return getApplicablePropertyDefinitions(
-                sub,
-                '/' + cleaned.join('/'),
-                referenceResolver,
-                schemaPathPrefix + '/oneOf/' + key);
+        const result = _.flatMap(schema.oneOf, (sub, key) => {
+            try {
+                return getApplicablePropertyDefinitions(
+                    sub,
+                    '/' + cleaned.join('/'),
+                    referenceResolver,
+                    schemaPathPrefix + '/oneOf/' + key);
+            }
+            catch (err) {
+                // It's not bad if we cant find the path in one of the subtypes, as long as one matches.
+                return [];
+            }
         });
+        if (result.length === 0) {
+            throw new Error(`Cannot find any way to navigate for path "${propertyPath}" and schema path "${schemaPathPrefix}"; none of the oneOf subtypes matches the given subkey!`);
+        }
+        return result;
     }
     else if (schema.anyOf && Array.isArray(schema.anyOf)) {
         return _.flatMap(schema.anyOf, (sub, key) => {
-            return getApplicablePropertyDefinitions(
-                sub,
-                '/' + cleaned.join('/'),
-                referenceResolver,
-                schemaPathPrefix + '/anyOf/' + key);
+            try {
+                return getApplicablePropertyDefinitions(
+                    sub,
+                    '/' + cleaned.join('/'),
+                    referenceResolver,
+                    schemaPathPrefix + '/anyOf/' + key);
+            }
+            catch (err) {
+                // It's not bad if we cant find the path in one of the subtypes, as long as one matches.
+                return [];
+            }
         });
     }
     //@TODO: support allOf, local-$ref-erences, ...
+
+    if (schema.type === 'object' && schema.additionalProperties !== false) {
+        if (typeof schema.additionalProperties === 'object') {
+            return getApplicablePropertyDefinitions(
+                schema.additionalProperties,
+                '/' + cleaned.join('/'),
+                referenceResolver,
+                schemaPathPrefix + '/additionalProperties');
+        }
+        else {
+            return [];
+        }
+    }
 
     throw new Error(`Cannot find any way to navigate for path "${propertyPath}" and schema path "${schemaPathPrefix}"!`);
 }
