@@ -56,6 +56,11 @@ export interface JsonSchema {
     patternProperties?: SchemaPatternPropertyMap<JsonSchema>;
 
     /**
+     * Whether or not additional properties are allowed, or when given a schema, what the propoerty names should validate for.
+     */
+    additionalProperties?: boolean | JsonSchema;
+
+    /**
      * The description of valid items for a field of type "array".
      */
     items?: JsonSchema | JsonSchema[];
