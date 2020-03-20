@@ -596,13 +596,13 @@ function applyFilter(filter: CollectionFilterDescriptor, val: any): boolean {
     switch (filter.operator) {
         case CollectionFilterOperator.Contains:
             if (Array.isArray(filter.value) && Array.isArray(val)) {
-                return val.some(x => filter.value.indexOf(x) > 0);
+                return val.some(x => filter.value.indexOf(x) >= 0);
             }
             else if (Array.isArray(filter.value) && !Array.isArray(val)) {
-                return (filter.value.indexOf(val) > 0);
+                return (filter.value.indexOf(val) >= 0);
             }
             else if (!Array.isArray(filter.value) && Array.isArray(val)) {
-                return (val.indexOf(filter.value) > 0);
+                return (val.indexOf(filter.value) >= 0);
             }
             return String(val).toLowerCase().indexOf(String(filter.value).toLowerCase()) >= 0;
         case CollectionFilterOperator.ContainsKey:
@@ -623,6 +623,15 @@ function applyFilter(filter: CollectionFilterDescriptor, val: any): boolean {
                 return false;
             }
         case CollectionFilterOperator.NotContains:
+            if (Array.isArray(filter.value) && Array.isArray(val)) {
+                return !val.every(x => filter.value.indexOf(x) >= 1);
+            }
+            else if (Array.isArray(filter.value) && !Array.isArray(val)) {
+                return (filter.value.indexOf(val) === -1);
+            }
+            else if (!Array.isArray(filter.value) && Array.isArray(val)) {
+                return (val.indexOf(filter.value) === -1);
+            }
             return String(val).toLowerCase().indexOf(String(filter.value).toLowerCase()) < 0;
         case CollectionFilterOperator.Equals:
             return String(val).toLowerCase() === String(filter.value).toLowerCase();
