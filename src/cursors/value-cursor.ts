@@ -595,6 +595,15 @@ function applyFilter(filter: CollectionFilterDescriptor, val: any): boolean {
     }
     switch (filter.operator) {
         case CollectionFilterOperator.Contains:
+            if (Array.isArray(filter.value) && Array.isArray(val)) {
+                return val.some(x => filter.value.indexOf(x) > 0);
+            }
+            else if (Array.isArray(filter.value) && !Array.isArray(val)) {
+                return (filter.value.indexOf(val) > 0);
+            }
+            else if (!Array.isArray(filter.value) && Array.isArray(val)) {
+                return (val.indexOf(filter.value) > 0);
+            }
             return String(val).toLowerCase().indexOf(String(filter.value).toLowerCase()) >= 0;
         case CollectionFilterOperator.ContainsKey:
             if (typeof val === 'object') {
